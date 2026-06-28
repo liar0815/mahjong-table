@@ -112,6 +112,8 @@
   .legend span{display:inline-flex;align-items:center;gap:5px}
   .sw{width:12px;height:12px;border-radius:3px;display:inline-block}
   .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;align-items:center;justify-content:center;padding:20px}
+  /* 確認ダイアログ(#modal)は、ライブラリ等ほかのモーダルより前面に出す（重なっても隠れないように）。 */
+  #modal{z-index:80}
   .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;max-width:360px;width:100%}
   .modal .msg{font-size:14px;margin-bottom:16px}
   .modal .mbtns{display:flex;gap:10px;justify-content:flex-end}
