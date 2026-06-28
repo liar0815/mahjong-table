@@ -118,6 +118,27 @@
   #toast{position:fixed;left:50%;top:18px;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);
     color:var(--txt);padding:10px 16px;border-radius:8px;z-index:60;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;max-width:90%;text-align:center}
   #toast.show{opacity:1}
+  /* ===== 大会ライブラリ（ブラウザ内保存）モーダルのスタイル ===== */
+  .lib-modal{max-width:480px}
+  .lib-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+  .lib-head strong{font-size:15px}
+  .lib-x{padding:6px 12px;font-size:12px}
+  .lib-save{display:flex;gap:8px;margin-bottom:14px}
+  .lib-save input{flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:9px 10px;font-size:14px}
+  .lib-save button{flex:0 0 auto;white-space:nowrap}
+  .lib-list{max-height:52vh;overflow:auto;display:flex;flex-direction:column;gap:8px}
+  .lib-item{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel2)}
+  .lib-meta{flex:1;min-width:0}
+  .lib-name{font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lib-sub{font-size:12px;color:var(--muted);margin-top:2px}
+  .lib-btns{display:flex;gap:6px;flex:0 0 auto}
+  .lib-btns button{padding:7px 12px;font-size:13px}
+  .lib-empty{color:var(--muted);font-size:13px;padding:10px 4px;line-height:1.7}
+  @media (max-width:640px){
+    .lib-save{flex-wrap:wrap}
+    .lib-save button{width:100%}
+    .lib-btns{flex-direction:column}
+  }
   details.collapse{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:14px}
   details.collapse>summary{padding:12px 16px;font-size:14px;color:var(--txt);font-weight:600;cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px}
   details.collapse>summary::-webkit-details-marker{display:none}
@@ -255,9 +276,7 @@
 
   <!-- 生成前は隠しておき（display:none）、対戦表ができたらJSが表示する -->
   <div class="actions" id="actions" style="display:none">
-    <button class="btn-sub" id="saveFile">💾 ファイルに保存（共有用）</button>
-    <button class="btn-sub" id="loadFile">📂 ファイルを読み込み</button>
-    <input id="fileInput" type="file" accept="application/json,.json" style="display:none">
+    <button class="btn-sub" id="libMng">📚 大会を保存・呼び出し</button>
     <button class="btn-sub" id="csv">Excel（CSV）で保存</button>
     <button class="btn-sub" id="clearScores">点数をクリア</button>
     <button class="btn-sub" id="regen">別の組み合わせで再生成</button>
@@ -292,6 +311,17 @@
   <div class="mbtns"><button class="btn-sub" id="modalNo">いいえ</button><button class="btn-main" id="modalYes">はい</button></div></div></div>
 <div id="toast"></div>
 
+<!-- ブラウザ内に保存した大会の一覧（ライブラリ）。名前を付けて保存し、ここから読み込み・削除する。
+     データは localStorage の LIB_KEY に配列として入る（端末のブラウザ内に残り、リロードしても消えない）。 -->
+<div class="modal-bg" id="libModal"><div class="modal lib-modal">
+  <div class="lib-head"><strong>📚 保存した大会</strong><button class="btn-sub lib-x" id="libClose">閉じる</button></div>
+  <div class="lib-save">
+    <input id="libName" type="text" placeholder="保存名（例：6月度大会）" maxlength="40">
+    <button class="btn-main" id="libSaveBtn">現在の大会を保存</button>
+  </div>
+  <div id="libList" class="lib-list"></div>
+</div></div>
+
 <script>
 /* ================================================================
    このアプリ全体の流れ（ざっくり）
@@ -302,7 +332,8 @@
    2. 画面に対戦表を描画（render）。各席に点棒の入力欄を出す。
    3. 点棒を入れると tableResult() がオカ・ウマ込みのスコアを計算し、
       順位表（standings）をリアルタイム更新する。
-   4. localStorage（ブラウザ内保存）に自動保存。ファイル/CSV出力もできる。
+   4. localStorage（ブラウザ内保存）に自動保存。さらに名前を付けて複数の大会を
+      ブラウザ内に保存・参照・削除できる（大会ライブラリ）。CSV出力もできる。
 
    データの持ち方（重要）
    ・current … 今表示している大会1件。{P:人数, R:戦数, T:卓数, rounds:[...], names:[...]} など
@@ -938,33 +969,75 @@ function onSettingsChange(){
 // 初期点・オカも入力確定（フォーカスを外す/Enter）で5桁未満を0埋め（例: 250→25000）してから反映
 ["setKichi","setOka"].forEach(id=>$(id).addEventListener("change",()=>{$(id).value=padScore($(id).value);onSettingsChange();}));
 
-// ===== ファイル保存／読み込み（別の端末や人と共有するため） =====
-// localStorageはそのブラウザ内だけ。別端末へ渡すにはJSONファイルとして書き出す。
-function exportFile(){
-  // 保存する内容をまとめる。new Date().toISOString()で保存日時も記録。
-  const data={app:"mahjong-taisenhyo",version:2,savedAt:new Date().toISOString(),settings,
-    schedule:{id:current.id,P:current.P,G:current.G,names:current.names,rounds:current.rounds},scores};
-  // JSON文字列をBlob(ファイル実体)にし、一時URLを作って<a download>を疑似クリックしてDL。
-  // JSON.stringify(data,null,2)の2は「インデント2スペースで見やすく整形」の意味。
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
-  const url=URL.createObjectURL(blob);const a=document.createElement("a");
-  a.href=url;a.download=`麻雀大会_${current.P}人_${current.R}R.json`;a.click();URL.revokeObjectURL(url);  // 最後にURLを解放
+// ===== 大会ライブラリ（ブラウザ内に複数の大会を保存・参照・削除） =====
+// localStorage の LIB_KEY に「保存した大会の配列」を入れる。1件 = 名前＋対戦表＋設定＋点数のスナップショット。
+// 自動保存(LAST_KEY)が「最後に開いた1件」なのに対し、こちらは名前を付けて好きなだけ残せる保管庫。
+const LIB_KEY="mahjong_library_v1";
+// 保管庫を読み込む。壊れていたら空配列にフォールバック（JSON.parseは失敗すると例外を投げる）。
+function loadLibrary(){try{const a=JSON.parse(localStorage.getItem(LIB_KEY)||"[]");return Array.isArray(a)?a:[];}catch(e){return [];}}
+// 保管庫を書き戻す。容量超過(QuotaExceeded)などで失敗したら通知して false を返す。
+function saveLibrary(lib){try{localStorage.setItem(LIB_KEY,JSON.stringify(lib));return true;}catch(e){uiToast("保存できませんでした（ブラウザの保存容量が一杯の可能性）");return false;}}
+
+// 今表示中の大会を、入力された名前でライブラリへ保存する。点数・設定も丸ごと含める。
+function saveCurrentToLibrary(name){
+  if(!current){uiToast("先に対戦表を作成してください");return;}
+  name=(name||"").trim();
+  if(!name){uiToast("保存名を入力してください");$("libName").focus();return;}
+  const lib=loadLibrary();
+  // 保存する1件分のデータ。keyは一意なID（時刻＋乱数）。scores/settingsは今の値をコピーして固定。
+  const makeEntry=key=>({key,name,savedAt:new Date().toISOString(),
+    P:current.P,G:current.G,names:current.names.slice(),rounds:current.rounds,
+    settings:{kichi:settings.kichi,oka:settings.oka,uma:settings.uma},scores:Object.assign({},scores)});
+  // 同じ名前が既にあれば上書き確認。違う名前なら新規追加。
+  const idx=lib.findIndex(e=>e.name===name);
+  if(idx>=0){
+    uiConfirm(`「${name}」はすでに保存されています。上書きしますか？`,()=>{
+      lib[idx]=makeEntry(lib[idx].key);                       // keyは引き継いで中身だけ更新
+      if(saveLibrary(lib)){renderLibList();uiToast("上書き保存しました");}
+    });
+    return;
+  }
+  lib.push(makeEntry(Date.now()+"_"+((Math.random()*1e6)|0)));
+  if(saveLibrary(lib)){$("libName").value="";renderLibList();uiToast("保存しました");}
 }
-// 選んだファイルを読み込んで復元する
-function importFile(file){
-  const fr=new FileReader();                  // ファイルを非同期で読む仕組み
-  fr.onload=()=>{                             // 読み終わったら実行される
-    try{
-      const d=JSON.parse(fr.result);           // 文字列→オブジェクト
-      const sch=d.schedule||d;                 // 新形式(schedule入り)・旧形式どちらも受ける
-      if(!sch.names||!sch.rounds) throw 0;      // 必要な項目が無ければ不正ファイル
-      if(d.settings) sch.settings=d.settings;
-      loadState(sch, d.scores||{});
-      uiToast("読み込みました");
-    }catch(e){uiToast("このファイルは読み込めませんでした（形式が違います）");}  // 壊れたファイル対策
+// ライブラリの1件を読み込んで画面に復元する。点数があれば確認してから上書き。
+function loadFromLibrary(key){
+  const e=loadLibrary().find(x=>x.key===key);if(!e)return;
+  const apply=()=>{
+    // loadState は保存データ d と点数 sc から current を組み立てる共通処理（ファイル復元と同じ入口）。
+    loadState({id:e.key,P:e.P,G:e.G,names:e.names,rounds:e.rounds,settings:e.settings}, e.scores||{});
+    closeLib();uiToast(`「${e.name}」を読み込みました`);
   };
-  fr.readAsText(file);
+  if(hasScores()) uiConfirm("現在入力中の点数は失われます。読み込みますか？",apply); else apply();
 }
+// ライブラリの1件を削除する（確認あり）。filterでkeyが一致しないものだけ残す。
+function deleteFromLibrary(key){
+  const e=loadLibrary().find(x=>x.key===key);if(!e)return;
+  uiConfirm(`「${e.name}」を削除します。よろしいですか？`,()=>{
+    if(saveLibrary(loadLibrary().filter(x=>x.key!==key))){renderLibList();uiToast("削除しました");}
+  });
+}
+// ライブラリ一覧のHTMLを組み立てて #libList に描画する。新しい保存が上に来るよう日時で降順ソート。
+function renderLibList(){
+  const lib=loadLibrary().sort((a,b)=>String(b.savedAt||"").localeCompare(String(a.savedAt||"")));
+  const box=$("libList");
+  if(!lib.length){box.innerHTML='<div class="lib-empty">まだ保存された大会はありません。<br>上の欄に名前を入れて「現在の大会を保存」を押すと、ここに一覧表示され、いつでも読み込めます。</div>';return;}
+  box.innerHTML=lib.map(e=>{
+    const d=new Date(e.savedAt);                              // 保存日時を「2026/6/28 14:05」の形に整形
+    const dt=isNaN(d.getTime())?"":`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+    const R=e.rounds?e.rounds.length:0;                       // 戦数
+    const hasSc=e.scores&&Object.keys(e.scores).length>0;     // 点数が入っているか
+    // data-key に一意IDを埋め込み、クリック時にどの大会かを特定する（委譲で1か所受け）。
+    return `<div class="lib-item"><div class="lib-meta">`+
+      `<div class="lib-name">${esc(e.name)}</div>`+
+      `<div class="lib-sub">${e.P}人・${R}戦${hasSc?'・点数あり':''}　${dt}</div></div>`+
+      `<div class="lib-btns"><button class="btn-main lib-load" data-key="${esc(e.key)}">読み込み</button>`+
+      `<button class="btn-sub lib-del" data-key="${esc(e.key)}">削除</button></div></div>`;
+  }).join("");
+}
+// ライブラリモーダルを開く（名前欄を空にして最新の一覧を表示）／閉じる
+function openLib(){$("libName").value="";renderLibList();$("libModal").style.display="flex";}
+function closeLib(){$("libModal").style.display="none";}
 
 // ===== CSV出力（Excelで開ける表形式） =====
 // CSVは「カンマ区切りのテキスト」。1行=1レコード、セルをカンマで区切る。
@@ -1010,9 +1083,19 @@ function doGen(){if(generate((Math.random()*1e9)>>>0))setCfg(false);}
 $("gen").onclick=()=>{if(hasScores())uiConfirm("新しく生成すると、入力した点数は失われます。よろしいですか？",doGen);else doGen();};
 $("regen").onclick=()=>{if(hasScores())uiConfirm("再生成すると、入力した点数は失われます。よろしいですか？",doGen);else doGen();};
 $("clearScores").onclick=()=>{if(!hasScores())return;uiConfirm("入力した点数をすべてクリアします。よろしいですか？",()=>{scores={};saveScores(true);render();uiToast("点数をクリアしました");});};
-$("saveFile").onclick=exportFile;
-$("loadFile").onclick=()=>$("fileInput").click();   // 隠しファイル入力をクリックさせて選択ダイアログを開く
-$("fileInput").onchange=e=>{if(e.target.files[0])importFile(e.target.files[0]);e.target.value="";};  // 選択後、同じファイル再選択もできるよう値をクリア
+// 大会ライブラリ（ブラウザ内保存）の各操作を割り当て
+$("libMng").onclick=openLib;                         // 「📚 大会を保存・呼び出し」でモーダルを開く
+$("libClose").onclick=closeLib;
+$("libSaveBtn").onclick=()=>saveCurrentToLibrary($("libName").value);
+// 名前欄でEnterを押しても保存できるように
+$("libName").addEventListener("keydown",e=>{if(e.key==="Enter")saveCurrentToLibrary($("libName").value);});
+// 一覧内の「読み込み」「削除」ボタンを1か所で受ける（イベント委譲）。data-keyで対象を特定。
+$("libList").addEventListener("click",e=>{
+  const ld=e.target.closest(".lib-load");if(ld){loadFromLibrary(ld.dataset.key);return;}
+  const dl=e.target.closest(".lib-del");if(dl){deleteFromLibrary(dl.dataset.key);return;}
+});
+// モーダルの背景（外側）クリックで閉じる
+$("libModal").addEventListener("click",e=>{if(e.target===$("libModal"))closeLib();});
 $("csv").onclick=toCSV;
 // 印刷の直前は折りたたみ(details)を一時的に全部開き（中身も印刷されるように）、印刷後に元に戻す。
 // d.dataset.w に「元が開いていたか(1/0)」を覚えておく。
