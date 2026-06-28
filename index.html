@@ -219,7 +219,7 @@
      ・.wrap         … 本文全体の中央寄せコンテナ
         - 設定パネル（人数/試合数/名前/スコアルール）
         - #error / #note … エラーや注意書きの表示場所（JSが書き込む）
-        - .actions     … 保存/読込/CSV/再生成などの操作ボタン
+        - .actions     … 保存・呼び出し/点数クリア/再生成などの操作ボタン
         - #stats #standings #rounds #matrix … JSが中身を生成して挿入する空の器
      ・#modal #toast  … 確認ダイアログ・通知（自前実装。理由は後述）
      id 付きの要素は、JS側から $("id") で掴んで中身を書き換える「差し込み口」。
@@ -252,9 +252,6 @@
 
   <div class="panelbox" id="cfgPanel">
     <h2>スコア計算ルール</h2>
-    <!-- 初期点・オカ・点棒は5桁未満で入力すると末尾に0を補って5桁にする（例: 250→25000, 253→25300）。
-         0埋めは入力確定（フォーカスを外す/Enter）時に行い、値は常にフル桁で扱う。 -->
-    <p class="note" style="margin:0 0 12px">※ 初期点・オカ・点棒は <b>5桁未満で入力すると末尾に「0」を補って5桁</b> にします（例: <b>250</b>→25000、<b>253</b>→25300）。</p>
     <div class="row">
       <div class="field">
         <label>初期点（配給原点）</label>
@@ -267,10 +264,10 @@
       <div class="field">
         <label>ウマ</label>
         <select id="setUma">
-          <option value="5-10">5-10（+10 / +5 / −5 / −10）</option>
-          <option value="10-20" selected>10-20（+20 / +10 / −10 / −20）</option>
-          <option value="10-30">10-30（+30 / +10 / −10 / −30）</option>
-          <option value="20-30">20-30（+30 / +20 / −20 / −30）</option>
+          <option value="5-10">5-10</option>
+          <option value="10-20" selected>10-20</option>
+          <option value="10-30">10-30</option>
+          <option value="20-30">20-30</option>
         </select>
       </div>
       <span class="hint" id="kaeshiInfo"></span>
@@ -285,7 +282,6 @@
   <!-- 生成前は隠しておき（display:none）、対戦表ができたらJSが表示する -->
   <div class="actions" id="actions" style="display:none">
     <button class="btn-sub" id="libMng">📚 大会を保存・呼び出し</button>
-    <button class="btn-sub" id="csv">Excel（CSV）で保存</button>
     <button class="btn-sub" id="clearScores">点数をクリア</button>
     <button class="btn-sub" id="regen">別の組み合わせで再生成</button>
     <span class="saved" id="savedMsg">✓ 自動保存しました</span>
@@ -389,7 +385,7 @@ function libCol(){return db.collection("rooms").doc(ROOM).collection("tournament
       順位表（standings）をリアルタイム更新する。
    4. 作業中の1件は localStorage に自動保存（端末内・下書き的な控え）。
       さらに名前を付けた大会はクラウド(Firebase/Firestore)に保存・参照・削除でき、
-      合言葉を知る端末ならどこからでも開ける（大会ライブラリ）。CSV出力もできる。
+      合言葉を知る端末ならどこからでも開ける（大会ライブラリ）。
 
    データの持ち方（重要）
    ・current … 今表示している大会1件。{P:人数, R:戦数, T:卓数, rounds:[...], names:[...]} など
@@ -710,10 +706,9 @@ function render(){
         const key=`${r}_${t}_${i}`;const val=scores[key]!=null?esc(scores[key]):"";
         // 席1行：風ラベル＋名前＋符号反転ボタン(±)＋点棒入力＋計算結果(pt)の表示枠。
         // esc()はHTMLエスケープ。名前に < や & が入っても表示崩れ・XSSを防ぐ。
-        // 点棒は5桁未満で入力すると確定時に末尾0埋めで5桁になる（changeイベントで処理）。
         h+=`<div class="seat" data-r="${r}" data-t="${t}" data-s="${i}"><span class="wind">${WINDS[i]}</span><span class="pname">${esc(names[p])}</span>`+
            `<button class="signbtn" type="button" title="プラス・マイナス切替">±</button>`+
-           `<input class="score-input" type="number" inputmode="numeric" step="100" placeholder="点棒" title="5桁未満で入力すると末尾に0を補って5桁にします（例:320→32000）" data-key="${key}" value="${val}">`+
+           `<input class="score-input" type="number" inputmode="numeric" step="100" placeholder="点棒" data-key="${key}" value="${val}">`+
            `<span class="pt" id="pt_${key}"></span></div>`;
       });
       h+=`</div>`;
@@ -791,7 +786,9 @@ function updateTotals(){
         sumEl.textContent="合計 "+res.sum.toLocaleString()+(ok?"":" ⚠");  // ずれていたら⚠
         sumEl.classList.toggle("bad",!ok);          // ずれていれば赤く（badクラス付与）
       }else{
-        sumEl.textContent=res.filled?`記入 ${res.filled}/4`:"";  // 未完成は「記入x/4」
+        // 4人そろっていなくても、その時点までの合計を常に表示（後ろに「記入x/4」を添える）。
+        // 途中経過なので合計のズレ判定(⚠/赤)はしない。
+        sumEl.textContent="合計 "+res.sum.toLocaleString()+`（記入 ${res.filled}/4）`;
         sumEl.classList.remove("bad");
       }
     }
@@ -832,18 +829,7 @@ function fmtSigned(n){const r=Math.round(n*10)/10;return (r>0?"+":"")+(Number.is
 //   s=符号, a=絶対値, th=千の位(切り捨て), rem=端数。rem>=600なら1繰り上げ。最後に符号を戻す。
 function gosha(n){const s=n<0?-1:1,a=Math.abs(n),th=Math.floor(a/1000),rem=a-th*1000;return s*(th+(rem>=600?1:0));}
 
-// 入力値を5桁に0埋めする。5桁未満の数字は末尾に0を足して5桁へ（例: 250→25000, 253→25300, 89→89000）。
-// 符号(-)は保持。空や5桁以上はそのまま。麻雀点は「下2桁00・5桁が基本」という前提のための補助。
-function padScore(s){
-  s=String(s).trim();
-  if(s==="") return "";
-  const neg=s[0]==="-";
-  let d=s.replace(/[^\d]/g,"");          // 数字部分だけ取り出す
-  if(d==="") return "";
-  if(d.length<5) d=d.padEnd(5,"0");      // 5桁未満なら末尾に0を補って5桁に
-  return (neg?"-":"")+d;
-}
-// 入力欄の値を保存する共通処理。空・不正なら削除、数値ならフル桁の文字列で保存。
+// 入力欄の値を保存する共通処理。空・不正なら削除、数値ならそのままの文字列で保存。
 function storeSeatScore(inp){
   const key=inp.dataset.key;
   if(inp.value===""||isNaN(parseFloat(inp.value))) delete scores[key]; else scores[key]=inp.value;
@@ -853,18 +839,11 @@ function storeSeatScore(inp){
 // 「イベント委譲」：個々の入力欄ではなく親の#roundsに1つだけリスナーを付ける。
 // 入力欄は再描画で作り直されるが、親は不変なのでリスナーを貼り直す必要がない（効率的）。
 // e.target.closest(".score-input") で、実際に入力されたのが点棒欄か判定する。
-// input：1文字ごとに発火。入力途中の値をそのまま保存して合計/順位を即時更新（0埋めはまだしない）。
+// input：1文字ごとに発火。入力された値をそのまま保存して合計/順位を即時更新（入力値は加工しない）。
 $("rounds").addEventListener("input",e=>{
   const inp=e.target.closest(".score-input");if(!inp)return;  // 点棒欄以外の入力は無視
   storeSeatScore(inp);
   saveScores(true);updateTotals();                 // 保存＆合計/順位を即時更新
-});
-// change：入力確定（フォーカスを外す/Enter）で発火。5桁未満なら末尾0埋めして5桁にし、保存し直す。
-$("rounds").addEventListener("change",e=>{
-  const inp=e.target.closest(".score-input");if(!inp)return;
-  inp.value=padScore(inp.value);                   // 例: 320→32000
-  storeSeatScore(inp);
-  saveScores(false);updateTotals();
 });
 // ±ボタンで符号を反転（スマホの数字キーパッドにマイナスが無い環境向けの工夫）
 $("rounds").addEventListener("click",e=>{
@@ -873,7 +852,6 @@ $("rounds").addEventListener("click",e=>{
   const v=inp.value.trim();
   if(v===""||v==="-"){inp.focus();return;}          // 空や"-"だけなら反転せずフォーカスだけ
   inp.value=(v.charAt(0)==="-")?v.slice(1):"-"+v;   // 先頭が"-"なら外す、なければ付ける
-  inp.value=padScore(inp.value);                   // ±押下も確定扱いで5桁に0埋め
   storeSeatScore(inp);
   saveScores(true);updateTotals();
 });
@@ -1022,8 +1000,6 @@ function onSettingsChange(){
 }
 // 3つの設定欄すべてに同じ処理を登録（配列にして forEach でまとめて addEventListener）
 ["setKichi","setOka","setUma"].forEach(id=>$(id).addEventListener("input",onSettingsChange));
-// 初期点・オカも入力確定（フォーカスを外す/Enter）で5桁未満を0埋め（例: 250→25000）してから反映
-["setKichi","setOka"].forEach(id=>$(id).addEventListener("change",()=>{$(id).value=padScore($(id).value);onSettingsChange();}));
 
 // ===== 大会ライブラリ（クラウド/Firestoreに複数の大会を保存・参照・削除） =====
 // 保存先は rooms/{合言葉}/tournaments コレクション（libCol()）。1ドキュメント = 1大会。
@@ -1126,42 +1102,6 @@ function switchRoom(name){
 function openLib(){$("libName").value="";refreshRoomLabel();$("libRoomEditor").style.display="none";renderLibList();$("libModal").style.display="flex";}
 function closeLib(){$("libModal").style.display="none";}
 
-// ===== CSV出力（Excelで開ける表形式） =====
-// CSVは「カンマ区切りのテキスト」。1行=1レコード、セルをカンマで区切る。
-// ここでは rows という2次元配列（行の配列）を組み立て、最後にCSV文字列へ変換する。
-function toCSV(){
-  const {names,rounds}=current;
-  const {total,scheduled,completed,tinfo}=computeAll();
-  // まず設定と、対戦表の見出し行を入れる（空配列[]は空行）
-  let rows=[
-    ["■ 設定"],["初期点",settings.kichi,"オカ",settings.oka,"ウマ",settings.uma,"返し点",settings.kichi+settings.oka/4],
-    [],["■ 対戦表"],["試合","卓","席","プレイヤー","点棒","着順","スコア"]];
-  // 全戦・全卓・全席を1行ずつ追加
-  rounds.forEach((rd,r)=>{
-    rd.tables.forEach((tbl,t)=>{
-      const res=tinfo[`${r}_${t}`].res;
-      tbl.forEach((p,i)=>{
-        const v=scores[`${r}_${t}_${i}`];
-        rows.push([`第${r+1}戦`,`卓${t+1}`,WINDS[i],names[p],(v==null?"":v),
-          res.allEntered?(res.rank[i]+1)+"着":"", res.allEntered?fmtSigned(res.sc[i]):""]);
-      });
-    });
-    if(rd.byes.length) rows.push([`第${r+1}戦`,"抜け番","","",rd.byes.map(p=>names[p]).join(" / "),"",""]);  // 抜け番行
-  });
-  rows.push([]);
-  // 順位表も付ける（合計スコアの高い順、同点は同順位）
-  rows.push(["■ 順位表"],["順位","プレイヤー","消化試合","合計スコア"]);
-  const order=names.map((nm,p)=>({nm,total:total[p],completed:completed[p],scheduled:scheduled[p]})).sort((a,b)=>b.total-a.total);
-  let rank=0,prev=null;
-  order.forEach((o,idx)=>{if(prev===null||Math.abs(o.total-prev)>1e-9){rank=idx+1;prev=o.total;}
-    rows.push([rank,o.nm,`${o.completed}/${o.scheduled}`,fmtSigned(o.total)]);});
-  // rows(2次元配列)をCSV文字列に変換。値に , " 改行 を含むセルは "" で囲み、中の " は "" に増やす（CSVの規則）。
-  const csv=rows.map(r=>r.map(c=>{c=(c==null?"":String(c));return /[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c;}).join(",")).join("\r\n");
-  // 先頭の "﻿"(BOM)は、ExcelでUTF-8の日本語が文字化けしないためのおまじない。
-  const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8;"});
-  const url=URL.createObjectURL(blob);const a=document.createElement("a");
-  a.href=url;a.download=`麻雀対戦表_${current.P}人_${current.R}R.csv`;a.click();URL.revokeObjectURL(url);
-}
 
 // ===== 各ボタンの動作を割り当て =====
 // 生成本体。乱数の種をランダムに作って generate を呼び、成功したら設定欄を畳む。
@@ -1191,7 +1131,6 @@ $("libList").addEventListener("click",e=>{
 });
 // モーダルの背景（外側）クリックで閉じる
 $("libModal").addEventListener("click",e=>{if(e.target===$("libModal"))closeLib();});
-$("csv").onclick=toCSV;
 // 印刷の直前は折りたたみ(details)を一時的に全部開き（中身も印刷されるように）、印刷後に元に戻す。
 // d.dataset.w に「元が開いていたか(1/0)」を覚えておく。
 window.addEventListener("beforeprint",()=>document.querySelectorAll("details.collapse").forEach(d=>{d.dataset.w=d.open?"1":"0";d.open=true;}));
