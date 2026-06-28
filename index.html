@@ -311,8 +311,8 @@
   <div class="mbtns"><button class="btn-sub" id="modalNo">いいえ</button><button class="btn-main" id="modalYes">はい</button></div></div></div>
 <div id="toast"></div>
 
-<!-- ブラウザ内に保存した大会の一覧（ライブラリ）。名前を付けて保存し、ここから読み込み・削除する。
-     データは localStorage の LIB_KEY に配列として入る（端末のブラウザ内に残り、リロードしても消えない）。 -->
+<!-- 保存した大会の一覧（ライブラリ）。名前を付けて保存し、ここから読み込み・削除する。
+     データはクラウド(Firestore)の rooms/{合言葉}/tournaments に入る（端末を変えても残る）。 -->
 <div class="modal-bg" id="libModal"><div class="modal lib-modal">
   <div class="lib-head"><strong>📚 保存した大会</strong><button class="btn-sub lib-x" id="libClose">閉じる</button></div>
   <div class="lib-save">
@@ -321,6 +321,40 @@
   </div>
   <div id="libList" class="lib-list"></div>
 </div></div>
+
+<!-- ============================================================
+     Firebase（Googleのクラウド）SDKの読み込み。
+     ・firebase-app-compat … 土台。firebase.initializeApp() を提供
+     ・firebase-firestore-compat … データベース(Firestore)機能
+     "compat"版を使うのは、このアプリが昔ながらの<script>（モジュールでない）で
+     書かれているため。これらを読み込むとグローバルに firebase が生える。
+     ※ これらは下の本体<script>より前に置くこと（先に読み込ませる）。
+     ============================================================ -->
+<script src="https://www.gstatic.com/firebasejs/11.0.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore-compat.js"></script>
+<script>
+/* ===== Firebase 接続設定（このプロジェクト固有の宛先情報） =====
+   apiKey 等は「秘密のパスワード」ではなく公開してよい識別子。
+   実際のアクセス制御は Firestore の「セキュリティルール」で行う。 */
+const firebaseConfig = {
+  apiKey: "AIzaSyDjG1SR0MUSiWiNqCRlRMK3H_UYb2gwLsc",
+  authDomain: "mahjong-c6465.firebaseapp.com",
+  projectId: "mahjong-c6465",
+  storageBucket: "mahjong-c6465.firebasestorage.app",
+  messagingSenderId: "769151958759",
+  appId: "1:769151958759:web:946d97dbe98be35a3a6c42"
+};
+/* ★合言葉（ルーム名）★
+   仲間内でデータを共有するための“部屋の名前”。これを知っている人だけが
+   同じ大会一覧を見られる（半角の英数字とハイフンのみ推奨）。
+   秘密にしたいときは、ここを自分たちだけの言葉に書き換える。 */
+const ROOM = "nakama-mahjong";
+// Firebaseを起動し、Firestore（データベース）への接続dbを用意する。
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+// このアプリのデータの保存場所：rooms/{合言葉}/tournaments/{大会ID} のコレクション。
+function libCol(){return db.collection("rooms").doc(ROOM).collection("tournaments");}
+</script>
 
 <script>
 /* ================================================================
@@ -332,8 +366,9 @@
    2. 画面に対戦表を描画（render）。各席に点棒の入力欄を出す。
    3. 点棒を入れると tableResult() がオカ・ウマ込みのスコアを計算し、
       順位表（standings）をリアルタイム更新する。
-   4. localStorage（ブラウザ内保存）に自動保存。さらに名前を付けて複数の大会を
-      ブラウザ内に保存・参照・削除できる（大会ライブラリ）。CSV出力もできる。
+   4. 作業中の1件は localStorage に自動保存（端末内・下書き的な控え）。
+      さらに名前を付けた大会はクラウド(Firebase/Firestore)に保存・参照・削除でき、
+      合言葉を知る端末ならどこからでも開ける（大会ライブラリ）。CSV出力もできる。
 
    データの持ち方（重要）
    ・current … 今表示している大会1件。{P:人数, R:戦数, T:卓数, rounds:[...], names:[...]} など
@@ -969,70 +1004,87 @@ function onSettingsChange(){
 // 初期点・オカも入力確定（フォーカスを外す/Enter）で5桁未満を0埋め（例: 250→25000）してから反映
 ["setKichi","setOka"].forEach(id=>$(id).addEventListener("change",()=>{$(id).value=padScore($(id).value);onSettingsChange();}));
 
-// ===== 大会ライブラリ（ブラウザ内に複数の大会を保存・参照・削除） =====
-// localStorage の LIB_KEY に「保存した大会の配列」を入れる。1件 = 名前＋対戦表＋設定＋点数のスナップショット。
-// 自動保存(LAST_KEY)が「最後に開いた1件」なのに対し、こちらは名前を付けて好きなだけ残せる保管庫。
-const LIB_KEY="mahjong_library_v1";
-// 保管庫を読み込む。壊れていたら空配列にフォールバック（JSON.parseは失敗すると例外を投げる）。
-function loadLibrary(){try{const a=JSON.parse(localStorage.getItem(LIB_KEY)||"[]");return Array.isArray(a)?a:[];}catch(e){return [];}}
-// 保管庫を書き戻す。容量超過(QuotaExceeded)などで失敗したら通知して false を返す。
-function saveLibrary(lib){try{localStorage.setItem(LIB_KEY,JSON.stringify(lib));return true;}catch(e){uiToast("保存できませんでした（ブラウザの保存容量が一杯の可能性）");return false;}}
+// ===== 大会ライブラリ（クラウド/Firestoreに複数の大会を保存・参照・削除） =====
+// 保存先は rooms/{合言葉}/tournaments コレクション（libCol()）。1ドキュメント = 1大会。
+// ブラウザの履歴削除では消えず、合言葉を知る端末ならどこからでも同じ一覧を開ける。
+// 【重要】Firestoreは「配列の中の配列」を保存できない。roundsは tables:[[...]] という
+// 入れ子配列を含むので、対戦表・点数などはまとめてJSON文字列(payload)にして1フィールドに収める。
+// 一覧表示用に name / savedAt / P / R / hasScores だけは個別フィールドにも持たせる。
 
-// 今表示中の大会を、入力された名前でライブラリへ保存する。点数・設定も丸ごと含める。
-function saveCurrentToLibrary(name){
+// 今表示中の大会を、入力された名前でクラウドへ保存する。点数・設定も丸ごと含める。
+async function saveCurrentToLibrary(name){
   if(!current){uiToast("先に対戦表を作成してください");return;}
   name=(name||"").trim();
   if(!name){uiToast("保存名を入力してください");$("libName").focus();return;}
-  const lib=loadLibrary();
-  // 保存する1件分のデータ。keyは一意なID（時刻＋乱数）。scores/settingsは今の値をコピーして固定。
-  const makeEntry=key=>({key,name,savedAt:new Date().toISOString(),
-    P:current.P,G:current.G,names:current.names.slice(),rounds:current.rounds,
-    settings:{kichi:settings.kichi,oka:settings.oka,uma:settings.uma},scores:Object.assign({},scores)});
-  // 同じ名前が既にあれば上書き確認。違う名前なら新規追加。
-  const idx=lib.findIndex(e=>e.name===name);
-  if(idx>=0){
-    uiConfirm(`「${name}」はすでに保存されています。上書きしますか？`,()=>{
-      lib[idx]=makeEntry(lib[idx].key);                       // keyは引き継いで中身だけ更新
-      if(saveLibrary(lib)){renderLibList();uiToast("上書き保存しました");}
-    });
-    return;
-  }
-  lib.push(makeEntry(Date.now()+"_"+((Math.random()*1e6)|0)));
-  if(saveLibrary(lib)){$("libName").value="";renderLibList();uiToast("保存しました");}
+  // 1件分のドキュメントを組み立てる。入れ子データ(rounds等)は payload(JSON文字列)へ。
+  const buildDoc=()=>({
+    name, savedAt:new Date().toISOString(), P:current.P, R:current.rounds.length,
+    hasScores:Object.keys(scores).length>0,
+    payload:JSON.stringify({G:current.G,names:current.names,rounds:current.rounds,
+      settings:{kichi:settings.kichi,oka:settings.oka,uma:settings.uma},scores})
+  });
+  try{
+    // 同じ名前が既にあるか確認（あれば上書き、無ければ新規IDで追加）。
+    const dup=await libCol().where("name","==",name).limit(1).get();
+    if(!dup.empty){
+      const existId=dup.docs[0].id;
+      uiConfirm(`「${name}」はすでに保存されています。上書きしますか？`, async()=>{
+        try{await libCol().doc(existId).set(buildDoc());renderLibList();uiToast("上書き保存しました");}
+        catch(e){uiToast("保存に失敗しました（通信エラー）");}
+      });
+      return;
+    }
+    const id=Date.now()+"_"+((Math.random()*1e6)|0);          // 一意なドキュメントID
+    await libCol().doc(id).set(buildDoc());
+    $("libName").value="";renderLibList();uiToast("保存しました");
+  }catch(e){uiToast("保存に失敗しました（通信エラー・ルール設定を確認）");}
 }
-// ライブラリの1件を読み込んで画面に復元する。点数があれば確認してから上書き。
-function loadFromLibrary(key){
-  const e=loadLibrary().find(x=>x.key===key);if(!e)return;
+// クラウドの1件を読み込んで画面に復元する。点数があれば確認してから上書き。
+async function loadFromLibrary(key){
+  let e;
+  try{
+    const snap=await libCol().doc(key).get();
+    if(!snap.exists){uiToast("見つかりませんでした（削除済みかも）");return;}
+    e=snap.data();
+  }catch(err){uiToast("読み込みに失敗しました（通信エラー）");return;}
+  let pl;
+  try{pl=JSON.parse(e.payload||"{}");}catch(err){uiToast("データが壊れています");return;}
   const apply=()=>{
-    // loadState は保存データ d と点数 sc から current を組み立てる共通処理（ファイル復元と同じ入口）。
-    loadState({id:e.key,P:e.P,G:e.G,names:e.names,rounds:e.rounds,settings:e.settings}, e.scores||{});
+    // loadState は保存データ d と点数 sc から current を組み立てる共通処理。
+    loadState({id:key,P:e.P,G:pl.G,names:pl.names,rounds:pl.rounds,settings:pl.settings}, pl.scores||{});
     closeLib();uiToast(`「${e.name}」を読み込みました`);
   };
   if(hasScores()) uiConfirm("現在入力中の点数は失われます。読み込みますか？",apply); else apply();
 }
-// ライブラリの1件を削除する（確認あり）。filterでkeyが一致しないものだけ残す。
-function deleteFromLibrary(key){
-  const e=loadLibrary().find(x=>x.key===key);if(!e)return;
-  uiConfirm(`「${e.name}」を削除します。よろしいですか？`,()=>{
-    if(saveLibrary(loadLibrary().filter(x=>x.key!==key))){renderLibList();uiToast("削除しました");}
+// クラウドの1件を削除する（確認あり）。
+function deleteFromLibrary(key,name){
+  uiConfirm(`「${name}」を削除します。よろしいですか？`, async()=>{
+    try{await libCol().doc(key).delete();renderLibList();uiToast("削除しました");}
+    catch(e){uiToast("削除に失敗しました（通信エラー）");}
   });
 }
-// ライブラリ一覧のHTMLを組み立てて #libList に描画する。新しい保存が上に来るよう日時で降順ソート。
-function renderLibList(){
-  const lib=loadLibrary().sort((a,b)=>String(b.savedAt||"").localeCompare(String(a.savedAt||"")));
+// 一覧をクラウドから取得して #libList に描画する。新しい保存が上に来るよう日時で降順ソート。
+async function renderLibList(){
   const box=$("libList");
-  if(!lib.length){box.innerHTML='<div class="lib-empty">まだ保存された大会はありません。<br>上の欄に名前を入れて「現在の大会を保存」を押すと、ここに一覧表示され、いつでも読み込めます。</div>';return;}
-  box.innerHTML=lib.map(e=>{
+  box.innerHTML='<div class="lib-empty">読み込み中…</div>';
+  let docs;
+  try{
+    const snap=await libCol().get();
+    docs=snap.docs.map(d=>Object.assign({key:d.id},d.data()));
+  }catch(e){
+    box.innerHTML='<div class="lib-empty">一覧を取得できませんでした。<br>インターネット接続と、Firebaseの「セキュリティルール」設定をご確認ください。</div>';return;
+  }
+  docs.sort((a,b)=>String(b.savedAt||"").localeCompare(String(a.savedAt||"")));
+  if(!docs.length){box.innerHTML='<div class="lib-empty">まだ保存された大会はありません。<br>上の欄に名前を入れて「現在の大会を保存」を押すと、ここに一覧表示され、どの端末からでも読み込めます。</div>';return;}
+  box.innerHTML=docs.map(e=>{
     const d=new Date(e.savedAt);                              // 保存日時を「2026/6/28 14:05」の形に整形
     const dt=isNaN(d.getTime())?"":`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
-    const R=e.rounds?e.rounds.length:0;                       // 戦数
-    const hasSc=e.scores&&Object.keys(e.scores).length>0;     // 点数が入っているか
     // data-key に一意IDを埋め込み、クリック時にどの大会かを特定する（委譲で1か所受け）。
     return `<div class="lib-item"><div class="lib-meta">`+
       `<div class="lib-name">${esc(e.name)}</div>`+
-      `<div class="lib-sub">${e.P}人・${R}戦${hasSc?'・点数あり':''}　${dt}</div></div>`+
+      `<div class="lib-sub">${e.P}人・${e.R||0}戦${e.hasScores?'・点数あり':''}　${dt}</div></div>`+
       `<div class="lib-btns"><button class="btn-main lib-load" data-key="${esc(e.key)}">読み込み</button>`+
-      `<button class="btn-sub lib-del" data-key="${esc(e.key)}">削除</button></div></div>`;
+      `<button class="btn-sub lib-del" data-key="${esc(e.key)}" data-name="${esc(e.name)}">削除</button></div></div>`;
   }).join("");
 }
 // ライブラリモーダルを開く（名前欄を空にして最新の一覧を表示）／閉じる
@@ -1092,7 +1144,7 @@ $("libName").addEventListener("keydown",e=>{if(e.key==="Enter")saveCurrentToLibr
 // 一覧内の「読み込み」「削除」ボタンを1か所で受ける（イベント委譲）。data-keyで対象を特定。
 $("libList").addEventListener("click",e=>{
   const ld=e.target.closest(".lib-load");if(ld){loadFromLibrary(ld.dataset.key);return;}
-  const dl=e.target.closest(".lib-del");if(dl){deleteFromLibrary(dl.dataset.key);return;}
+  const dl=e.target.closest(".lib-del");if(dl){deleteFromLibrary(dl.dataset.key,dl.dataset.name);return;}
 });
 // モーダルの背景（外側）クリックで閉じる
 $("libModal").addEventListener("click",e=>{if(e.target===$("libModal"))closeLib();});
