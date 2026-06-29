@@ -176,6 +176,7 @@
     border-radius:10px;padding:12px 12px;font-size:16px}
   .gate-card input:focus{outline:none;border-color:var(--accent)}
   .gate-card .btn-main{width:100%;margin-top:12px;padding:13px;font-size:15px}
+  .gate-card .gate-new{width:100%;margin-top:8px;padding:11px;font-size:13px}
   .gate-recent{margin-top:16px}
   .gate-recent .rec-ttl{font-size:12px;color:var(--muted);margin-bottom:7px}
   .gate-chips{display:flex;flex-wrap:wrap;gap:8px}
@@ -258,6 +259,7 @@
     <label for="gateInput">合言葉</label>
     <input id="gateInput" type="text" placeholder="例）sample-room" maxlength="40" autocomplete="off">
     <button class="btn-main" id="gateEnter">この合言葉で入る ▶</button>
+    <button class="btn-sub gate-new" id="gateNew">＋ 新しい大会をすぐ作る</button>
     <div class="gate-recent" id="gateRecent" style="display:none">
       <div class="rec-ttl">最近使った合言葉</div>
       <div class="gate-chips" id="gateChips"></div>
@@ -1154,7 +1156,9 @@ function showGate(){
   setTimeout(()=>{const i=$("gateInput");i.focus();i.select();},0);
 }
 // 合言葉を確定してメイン画面へ入る。検証→ROOM更新→端末に記憶→最近一覧へ→入り口を閉じて一覧表示。
-function enterRoom(name){
+// startNew=true のときは「新しい大会をすぐ作る」ショートカット：入室後に⚙設定を開いて
+// 参加人数欄までスクロール＆フォーカスする（A案・安全重視。データは消さず、生成は手動）。
+function enterRoom(name,startNew){
   name=(name||"").trim();
   // Firestoreのパス名として安全な文字に限定（半角英数・ハイフン・アンダースコア、1〜40文字）。
   if(!/^[A-Za-z0-9_-]{1,40}$/.test(name)){uiToast("合言葉は半角の英数字・ハイフン・アンダースコア（1〜40文字）で入力してください");return;}
@@ -1165,7 +1169,15 @@ function enterRoom(name){
   refreshRoomLabel();
   $("roomGate").style.display="none";                    // 入り口を閉じてメイン画面へ
   renderLibList();                                       // この部屋の保存一覧を表示
-  if(changed)uiToast(`合言葉「${ROOM}」で入室しました`);
+  if(startNew){
+    setCfg(true);                                        // ⚙設定パネルを開く
+    window.scrollTo(0,Math.max(0,$("cfgToggle").offsetTop-8));  // 設定までスクロール
+    // 描画後に参加人数欄へフォーカス＆全選択（すぐ打ち替えられるように）
+    setTimeout(()=>{const n=$("numPlayers");n.focus();n.select();},0);
+    uiToast("新しい大会の設定を開きました。人数・試合数を決めて「対戦表を生成」を押してください");
+  }else if(changed){
+    uiToast(`合言葉「${ROOM}」で入室しました`);
+  }
 }
 
 
@@ -1187,6 +1199,7 @@ $("libList").addEventListener("click",e=>{
 });
 // ===== 入り口（合言葉）画面の操作を割り当て =====
 $("gateEnter").onclick=()=>enterRoom($("gateInput").value);           // 「入る」で入室
+$("gateNew").onclick=()=>enterRoom($("gateInput").value,true);        // 「新しい大会をすぐ作る」：入室＋設定を開く
 $("gateInput").addEventListener("keydown",e=>{if(e.key==="Enter")enterRoom($("gateInput").value);});  // Enterでも入室
 // 最近使った合言葉チップをクリックしたら、その合言葉で入室
 $("gateChips").addEventListener("click",e=>{const c=e.target.closest(".gate-chip");if(c)enterRoom(c.dataset.room);});
