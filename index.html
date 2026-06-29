@@ -167,7 +167,6 @@
   /* 見出しタイトルは語中で折り返さない（「保存した大\n会」を防ぐ）。長い注記は brief 側で省略する。 */
   details.collapse>summary .sum-ttl{white-space:nowrap;flex:0 0 auto}
   details.collapse .stats{margin:0;padding:0 14px 14px}
-  details.collapse #standings{padding:0 14px 14px}
   details.collapse #rounds{padding:8px 14px 6px}
   .cfg-toggle{width:100%;text-align:left;background:var(--panel);border:1px solid var(--line);color:var(--txt);
     border-radius:12px;padding:12px 16px;margin-bottom:14px;font-size:14px;font-weight:600;
@@ -379,7 +378,7 @@
 
   <!-- 生成前は隠しておき（display:none）、対戦表ができたらJSが表示する -->
   <div class="actions" id="actions" style="display:none">
-    <button class="btn-sub" id="copyImg">📋 順位表を画像でコピー</button>
+    <button class="btn-sub" id="copyImg">📋 順位表・成績を画像でコピー</button>
     <button class="btn-sub" id="clearScores">点数をクリア</button>
     <button class="btn-sub" id="regen">別の組み合わせで再生成</button>
     <span class="saved" id="savedMsg">✓ 自動保存しました</span>
@@ -392,12 +391,8 @@
     <summary>詳細情報（人数・偏り・席の均等）<span class="brief" id="statsBrief"></span></summary>
     <div class="stats" id="stats"></div>
   </details>
-  <details class="collapse" id="standBox">
-    <summary>順位表<span class="brief" id="standBrief"></span></summary>
-    <div id="standings"></div>
-  </details>
   <details class="collapse" id="pstatBox">
-    <summary>📊 個人成績<span class="brief" id="pstatBrief"></span></summary>
+    <summary>📊 順位表・成績<span class="brief" id="pstatBrief"></span></summary>
     <div id="pstats"></div>
   </details>
   <details class="collapse" id="roundsBox" open>
@@ -941,39 +936,28 @@ function updateTotals(){
     rows.push({p,name:names[p],total:total[p],scheduled:scheduled[p],completed:done,tops:rc[0],avg});
   }
   const anyScore=rows.some(r=>r.completed>0);       // 1卓でもスコア確定があるか（無ければ「–」表示）
-  // 同点判定ルール。tieVal(r)＝同点を割るための値。tieBetter(差)＝その値で前者が上なら正。
+  // 同点判定ルール。tieVal(r)＝同点を割るための値。
   const tie=settings.tie||"same";
   const tieVal=r=>tie==="top"?r.tops:(tie==="avg"?r.avg:0);
   const tieCmp=(a,b)=>tie==="avg"?(tieVal(a)-tieVal(b)):(tieVal(b)-tieVal(a));  // avgは小さいほど上位
   rows.sort((a,b)=> (b.total-a.total) || tieCmp(a,b));  // 合計降順→同点はルールで
-  $("standBrief").textContent=anyScore?`首位 ${rows[0].name} ${fmtSigned(rows[0].total)}`:"点数未入力";
-  const tieLbl={same:"同順位のまま",top:"トップ数",avg:"平均着順"}[tie];
-  let html=`<table class="stb">
-    <tr><th>順位</th><th>プレイヤー</th><th style="text-align:right">合計スコア</th><th style="text-align:right">消化</th></tr>`;
   // 順位付け。合計が違えば新順位。同点でもルールが same 以外で割れていれば新順位、割れなければ同順位。
   let rank=0,prevT=null,prevV=null;
   rows.forEach((r,idx)=>{
     const v=tieVal(r);
     const newGroup=prevT===null||Math.abs(r.total-prevT)>1e-9||(tie!=="same"&&v!==prevV);
     if(newGroup){rank=idx+1;prevT=r.total;prevV=v;}
-    r.rank=anyScore?rank:null;                       // 画像コピー用に順位も保持
-    const cls=r.total>0.0001?"plus":r.total<-0.0001?"minus":"";  // 正は緑/負は赤/0は無色
-    html+=`<tr><td class="pos">${anyScore?rank:'–'}</td><td>${esc(r.name)}</td>`+
-          `<td class="num ${cls}">${anyScore?fmtSigned(r.total):'–'}</td>`+
-          `<td class="num" style="color:var(--muted)">${r.completed}/${r.scheduled}</td></tr>`;  // 消化/予定
+    r.rank=anyScore?rank:null;                       // 表示・画像コピー用に順位を保持
   });
-  html+=`</table><div class="hint" style="margin-top:8px">※ 4人全員の点棒が入った卓に加え、3人入力した卓は残り1人を自動計算してスコアに含めます。素点は五捨六入で千点単位(pt)に丸め、端数（±1pt）は1着で調整して卓合計を0にしています。`+
-        (tie!=="same"?`<br>※ 合計が同点のときは「${tieLbl}」で順位を決めています。`:``)+`</div>`;
-  $("standings").innerHTML=html;
-  lastBoard={rows,anyScore};                         // 画像コピー用に最新の順位表データを控える
-  renderPlayerStats(rows,anyScore,rankCount,history,bust);// 個人成績タブ＋各賞を更新
+  lastBoard={rows,anyScore,rankCount};               // 画像コピー用に最新データを控える
+  renderPlayerStats(rows,anyScore,rankCount,history,bust);// 順位表・成績＋各賞を更新
 }
 
 // ===== 個人成績（各賞＋平均着順・着順分布・スコア推移） =====
 // 順位表と同じ並び（合計スコア降順）で、各人の詳細を表にする。先頭に各賞のカードを出す。
 function renderPlayerStats(rows,anyScore,rankCount,history,bust){
-  $("pstatBrief").textContent=anyScore?`${rows.filter(r=>r.completed>0).length}人集計`:"点数未入力";
-  if(!anyScore){$("pstats").innerHTML='<div class="hint" style="padding:4px 0">点数を入力すると、各賞・平均着順・トップ/ラス回数・スコア推移を表示します。</div>';return;}
+  $("pstatBrief").textContent=anyScore?`首位 ${rows[0].name} ${fmtSigned(rows[0].total)}`:"点数未入力";
+  if(!anyScore){$("pstats").innerHTML='<div class="hint" style="padding:4px 0">点数を入力すると、順位・合計スコア・平均着順・トップ/ラス回数・スコア推移を表示します。</div>';return;}
   // --- 各賞の集計（消化のある人だけが対象） ---
   const played=rows.filter(r=>r.completed>0);
   // 指標fnの最良値を持つ人たち（連名）を返す。higher=trueなら大きいほど良い。
@@ -995,13 +979,15 @@ function renderPlayerStats(rows,anyScore,rankCount,history,bust){
   aw+= card("🛡","ラス回避賞",lastAvoid.names.join("・"),`ラス率 ${(lastAvoid.val*100).toFixed(0)}%`);
   aw+=`</div>`;
   let h=aw+`<div class="pstat-wrap"><table class="stb pstat">
-    <tr><th>順位</th><th>プレイヤー</th><th style="text-align:right">平均着順</th>
-    <th style="text-align:center">着順 1-2-3-4</th><th style="text-align:right">合計</th><th>スコア推移</th></tr>`;
+    <tr><th>順位</th><th>プレイヤー</th><th style="text-align:right">合計</th><th style="text-align:right">消化</th>
+    <th style="text-align:right">平均着順</th><th style="text-align:center">着順 1-2-3-4</th><th>スコア推移</th></tr>`;
   rows.forEach(r=>{
     const rc=rankCount[r.p], done=r.completed;
     if(done===0){ // 未消化の人は控えめに1行
-      h+=`<tr><td class="pos">–</td><td>${esc(r.name)}</td><td class="num" style="color:var(--muted)">–</td>`+
-         `<td class="num" style="text-align:center;color:var(--muted)">0-0-0-0</td><td class="num">–</td><td></td></tr>`;
+      h+=`<tr><td class="pos">–</td><td>${esc(r.name)}</td><td class="num">–</td>`+
+         `<td class="num" style="color:var(--muted)">0/${r.scheduled}</td>`+
+         `<td class="num" style="color:var(--muted)">–</td>`+
+         `<td class="num" style="text-align:center;color:var(--muted)">0-0-0-0</td><td></td></tr>`;
       return;
     }
     // 平均着順＝Σ(着順×回数)/消化数。着順は0始まりなので+1して1〜4にする。
@@ -1010,76 +996,89 @@ function renderPlayerStats(rows,anyScore,rankCount,history,bust){
     // スコア推移：消化した各戦のスコアを符号付きチップで横並び（横スクロール可）。
     const chips=history[r.p].map(g=>`<span class="ptchip ${g.sc>0?'plus':g.sc<0?'minus':''}">${fmtSigned(g.sc)}</span>`).join("");
     h+=`<tr><td class="pos">${r.rank}</td><td>${esc(r.name)}</td>`+
+       `<td class="num ${cls}">${fmtSigned(r.total)}</td>`+
+       `<td class="num" style="color:var(--muted)">${r.completed}/${r.scheduled}</td>`+
        `<td class="num">${avg.toFixed(2)}</td>`+
        `<td class="num" style="text-align:center">${rc[0]}-${rc[1]}-${rc[2]}-${rc[3]}</td>`+
-       `<td class="num ${cls}">${fmtSigned(r.total)}</td>`+
        `<td><div class="ptchips">${chips}</div></td></tr>`;
   });
-  h+=`</table></div><div class="hint" style="margin-top:8px">※ 平均着順は小さいほど好成績（1.00が全戦トップ）。「着順 1-2-3-4」はトップ〜ラスの回数。</div>`;
+  // 注記：順位表と個人成績を統合したので、スコア計算・同点判定の注記もここにまとめる。
+  const tie=settings.tie||"same";
+  const tieLbl={same:"同順位のまま",top:"トップ数",avg:"平均着順"}[tie];
+  h+=`</table></div><div class="hint" style="margin-top:8px">※ 合計スコアの高い順。4人全員の点棒が入った卓に加え、3人入力した卓は残り1人を自動計算して含めます。`+
+     `<br>※ 平均着順は小さいほど好成績（1.00が全戦トップ）。「着順 1-2-3-4」はトップ〜ラスの回数。`+
+     (tie!=="same"?`<br>※ 合計が同点のときは「${tieLbl}」で順位を決めています。`:``)+`</div>`;
   $("pstats").innerHTML=h;
 }
 
-// ===== 順位表を画像でコピー =====
-// 順位表(lastBoard)をその場でcanvasに描画し、PNG画像としてクリップボードへコピーする。
+// ===== 順位表・成績を画像でコピー =====
+// 順位表・成績(lastBoard)をその場でcanvasに描画し、PNG画像としてクリップボードへコピーする。
 // LINE等にそのまま貼れる。クリップボード非対応の環境ではPNGダウンロードにフォールバック。
 function copyStandingsImage(){
   if(!current){uiToast("先に対戦表を作成してください");return;}
   if(!lastBoard||!lastBoard.anyScore){uiToast("点数が未入力です（先に点棒を入力してください）");return;}
-  const rows=lastBoard.rows;
+  const rows=lastBoard.rows, rankCount=lastBoard.rankCount;
   const C_PLUS="#178a45",C_MINUS="#cf4435",C_TXT="#1d2b23",C_MUTED="#5c7367",C_LINE="#cdded3",C_HEAD="#e6f1e9";
   const scale=Math.min(3,Math.max(2,Math.round(window.devicePixelRatio||2)));  // 高解像度で鮮明に
   const padX=22,padY=18,titleH=36,headH=32,rowH=30;
   // 名前列の幅を実測して決める
   const meas=document.createElement("canvas").getContext("2d");
   meas.font="bold 15px sans-serif";
-  let nameW=120; rows.forEach(r=>{nameW=Math.max(nameW,meas.measureText(r.name).width);});
-  const colRank=46,colName=Math.ceil(nameW)+20,colTotal=96,colDone=72;
-  const W=padX*2+colRank+colName+colTotal+colDone;
+  let nameW=96; rows.forEach(r=>{nameW=Math.max(nameW,meas.measureText(r.name).width);});
+  // 列定義（左→右）。align で寄せを指定。
+  const cols=[
+    {label:"順位",  w:46,            align:"center"},
+    {label:"プレイヤー",w:Math.ceil(nameW)+18,align:"left"},
+    {label:"合計",  w:86,            align:"right"},
+    {label:"消化",  w:60,            align:"center"},
+    {label:"平均着順",w:78,          align:"right"},
+    {label:"着順 1-2-3-4",w:100,     align:"center"},
+  ];
+  const colX=i=>{let x=padX;for(let k=0;k<i;k++)x+=cols[k].w;return x;}; // i列目の左端X
+  const W=padX*2+cols.reduce((s,c)=>s+c.w,0);
   const H=padY*2+titleH+headH+rowH*rows.length+6;
   const cv=document.createElement("canvas");cv.width=Math.round(W*scale);cv.height=Math.round(H*scale);
   const ctx=cv.getContext("2d");ctx.scale(scale,scale);ctx.textBaseline="middle";
+  // セル内テキスト描画（align準拠）
+  const cell=(i,text,y,style,font)=>{const c=cols[i],x=colX(i);ctx.fillStyle=style;ctx.font=font;
+    if(c.align==="left"){ctx.textAlign="left";ctx.fillText(text,x+8,y);}
+    else if(c.align==="right"){ctx.textAlign="right";ctx.fillText(text,x+c.w-8,y);}
+    else{ctx.textAlign="center";ctx.fillText(text,x+c.w/2,y);}};
   // 背景（白）
   ctx.fillStyle="#ffffff";ctx.fillRect(0,0,W,H);
   // タイトルと日付
   ctx.fillStyle=C_TXT;ctx.font="bold 19px sans-serif";ctx.textAlign="left";
-  ctx.fillText("順位表",padX,padY+titleH/2);
+  ctx.fillText("順位表・成績",padX,padY+titleH/2);
   const now=new Date();
   ctx.font="12px sans-serif";ctx.fillStyle=C_MUTED;ctx.textAlign="right";
   ctx.fillText(`${now.getFullYear()}/${now.getMonth()+1}/${now.getDate()}`,W-padX,padY+titleH/2);
-  // 列のX位置
-  const x0=padX, xRankC=x0+colRank/2, xName=x0+colRank+6,
-        xTotalR=x0+colRank+colName+colTotal-8, xDoneR=W-padX-6;
   // ヘッダ行
   let y=padY+titleH;
-  ctx.fillStyle=C_HEAD;ctx.fillRect(x0,y,W-padX*2,headH);
-  ctx.fillStyle=C_MUTED;ctx.font="bold 12px sans-serif";
-  ctx.textAlign="center";ctx.fillText("順位",xRankC,y+headH/2);
-  ctx.textAlign="left";ctx.fillText("プレイヤー",xName,y+headH/2);
-  ctx.textAlign="right";ctx.fillText("合計",xTotalR,y+headH/2);ctx.fillText("消化",xDoneR,y+headH/2);
+  ctx.fillStyle=C_HEAD;ctx.fillRect(padX,y,W-padX*2,headH);
+  cols.forEach((c,i)=>cell(i,c.label,y+headH/2,C_MUTED,"bold 12px sans-serif"));
   // データ行
   y+=headH;
   rows.forEach(r=>{
-    ctx.strokeStyle=C_LINE;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x0,y+rowH);ctx.lineTo(W-padX,y+rowH);ctx.stroke();
-    const cy=y+rowH/2;
-    ctx.fillStyle="#2a9152";ctx.font="bold 14px sans-serif";ctx.textAlign="center";
-    ctx.fillText(String(r.rank),xRankC,cy);
-    ctx.fillStyle=C_TXT;ctx.font="15px sans-serif";ctx.textAlign="left";
-    ctx.fillText(r.name,xName,cy);
-    ctx.font="bold 15px sans-serif";ctx.textAlign="right";
-    ctx.fillStyle=r.total>0.0001?C_PLUS:(r.total<-0.0001?C_MINUS:C_TXT);
-    ctx.fillText(fmtSigned(r.total),xTotalR,cy);
-    ctx.fillStyle=C_MUTED;ctx.font="13px sans-serif";
-    ctx.fillText(`${r.completed}/${r.scheduled}`,xDoneR,cy);
+    ctx.strokeStyle=C_LINE;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(padX,y+rowH);ctx.lineTo(W-padX,y+rowH);ctx.stroke();
+    const cy=y+rowH/2, done=r.completed, rc=rankCount[r.p];
+    cell(0,done?String(r.rank):"–",cy,"#2a9152","bold 14px sans-serif");          // 順位
+    cell(1,r.name,cy,C_TXT,"15px sans-serif");                                    // 名前
+    cell(2,done?fmtSigned(r.total):"–",cy,                                        // 合計（色分け）
+      done?(r.total>0.0001?C_PLUS:(r.total<-0.0001?C_MINUS:C_TXT)):C_MUTED,"bold 15px sans-serif");
+    cell(3,`${done}/${r.scheduled}`,cy,C_MUTED,"13px sans-serif");                // 消化
+    const avg=done?(rc[0]*1+rc[1]*2+rc[2]*3+rc[3]*4)/done:0;
+    cell(4,done?avg.toFixed(2):"–",cy,C_TXT,"14px sans-serif");                   // 平均着順
+    cell(5,`${rc[0]}-${rc[1]}-${rc[2]}-${rc[3]}`,cy,C_TXT,"13px sans-serif");     // 着順分布
     y+=rowH;
   });
   // PNG化 → クリップボードへ。失敗時はダウンロード。
   cv.toBlob(blob=>{
     if(!blob){uiToast("画像の生成に失敗しました");return;}
-    const fallback=()=>{const a=document.createElement("a");const u=URL.createObjectURL(blob);a.href=u;a.download="順位表.png";a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);uiToast("コピー不可のため画像を保存しました");};
+    const fallback=()=>{const a=document.createElement("a");const u=URL.createObjectURL(blob);a.href=u;a.download="順位表・成績.png";a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);uiToast("コピー不可のため画像を保存しました");};
     try{
       if(navigator.clipboard&&window.ClipboardItem){
         navigator.clipboard.write([new ClipboardItem({"image/png":blob})])
-          .then(()=>uiToast("順位表を画像でコピーしました"))
+          .then(()=>uiToast("順位表・成績を画像でコピーしました"))
           .catch(fallback);
       }else fallback();
     }catch(e){fallback();}
