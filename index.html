@@ -145,17 +145,18 @@
   .lib-save input{flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:9px 10px;font-size:14px}
   .lib-save button{flex:0 0 auto;white-space:nowrap}
   .lib-list{max-height:52vh;overflow:auto;display:flex;flex-direction:column;gap:8px}
-  .lib-item{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel2)}
-  .lib-meta{flex:1;min-width:0}
+  /* 名前は上の行で横幅いっぱい使い、ボタンは下の行に置く（名前が早く省略されるのを防ぐ） */
+  .lib-item{display:flex;flex-direction:column;align-items:stretch;gap:8px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel2)}
+  .lib-meta{min-width:0}
   .lib-name{font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .lib-sub{font-size:12px;color:var(--muted);margin-top:2px}
-  .lib-btns{display:flex;gap:6px;flex:0 0 auto}
+  .lib-btns{display:flex;gap:6px;justify-content:flex-end}
   .lib-btns button{padding:7px 12px;font-size:13px}
   .lib-empty{color:var(--muted);font-size:13px;padding:10px 4px;line-height:1.7}
   @media (max-width:640px){
     .lib-save{flex-wrap:wrap}
     .lib-save button{width:100%}
-    .lib-btns{flex-direction:column}
+    .lib-btns button{flex:1}
   }
   details.collapse{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:14px}
   details.collapse>summary{padding:12px 16px;font-size:14px;color:var(--txt);font-weight:600;cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px}
