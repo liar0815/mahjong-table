@@ -118,21 +118,9 @@
   .modal .msg{font-size:14px;margin-bottom:16px}
   .modal .mbtns{display:flex;gap:10px;justify-content:flex-end}
   #toast{position:fixed;left:50%;top:18px;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);
-    color:var(--txt);padding:10px 16px;border-radius:8px;z-index:60;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;max-width:90%;text-align:center}
+    color:var(--txt);padding:10px 16px;border-radius:8px;z-index:100;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;max-width:90%;text-align:center}
   #toast.show{opacity:1}
-  /* ===== 大会ライブラリ（ブラウザ内保存）モーダルのスタイル ===== */
-  .lib-modal{max-width:480px}
-  .lib-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
-  .lib-head strong{font-size:15px}
-  .lib-x{padding:6px 12px;font-size:12px}
-  .lib-room{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:12px}
-  .lib-room-now{font-size:13px;color:var(--txt)}
-  .lib-room-now b{color:var(--accent)}
-  .lib-room-btn{padding:5px 12px;font-size:12px;margin-left:8px}
-  .lib-room-editor{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px}
-  .lib-room-editor input{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:8px 10px;font-size:14px}
-  .lib-room-editor button{flex:0 0 auto;white-space:nowrap}
-  .lib-room-note{flex:1 1 100%;font-size:11px;color:var(--muted);line-height:1.6}
+  /* ===== 大会ライブラリ（保存した大会の一覧）のスタイル ===== */
   .lib-save{display:flex;gap:8px;margin-bottom:14px}
   .lib-save input{flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:9px 10px;font-size:14px}
   .lib-save button{flex:0 0 auto;white-space:nowrap}
@@ -171,6 +159,35 @@
   .swapmode .bye-chip{cursor:pointer}
   .swapmode .bye-chip:hover{box-shadow:inset 0 0 0 2px var(--accent)}
   .bye-chip.selected{background:#cdeed8;color:#1f6b3f;box-shadow:inset 0 0 0 2px var(--accent)}
+  /* ===== 入り口（合言葉）画面 =====
+     起動時に最前面で全画面を覆い、合言葉を入れて「入る」とメイン画面へ進む。
+     position:fixed + inset:0 で画面いっぱい。z-indexを高くして他より前に出す。 */
+  .gate{position:fixed;inset:0;z-index:90;background:linear-gradient(160deg,#e7f2ea,#cfe6d6);
+    display:flex;align-items:center;justify-content:center;padding:20px}
+  .gate-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+    padding:26px 26px 22px;max-width:440px;width:100%;box-shadow:0 12px 40px rgba(31,107,63,.16)}
+  .gate-card h1{margin:0 0 4px;font-size:22px;display:flex;align-items:center;gap:10px}
+  .gate-card .lead{margin:0 0 18px;color:var(--muted);font-size:13px;line-height:1.7}
+  .gate-card label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+  .gate-card input{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--txt);
+    border-radius:10px;padding:12px 12px;font-size:16px}
+  .gate-card input:focus{outline:none;border-color:var(--accent)}
+  .gate-card .btn-main{width:100%;margin-top:12px;padding:13px;font-size:15px}
+  .gate-recent{margin-top:16px}
+  .gate-recent .rec-ttl{font-size:12px;color:var(--muted);margin-bottom:7px}
+  .gate-chips{display:flex;flex-wrap:wrap;gap:8px}
+  .gate-chip{background:var(--panel2);border:1px solid var(--line);color:var(--txt);
+    border-radius:999px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer}
+  .gate-chip:hover{background:var(--chip);border-color:var(--accent);color:var(--accent2)}
+  .gate-note{margin-top:18px;font-size:11px;color:var(--muted);line-height:1.7}
+  /* メイン画面ヘッダー内の「部屋（合言葉）変更」ボタン */
+  .room-btn{background:var(--panel2);border:1px solid var(--line);color:var(--txt);
+    border-radius:999px;padding:6px 14px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+  .room-btn:hover{background:var(--chip);border-color:var(--accent)}
+  .room-btn b{color:var(--accent2)}
+  header .head-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+  /* インライン「保存した大会」パネルの中身の余白 */
+  details.collapse .lib-inline{padding:0 14px 14px}
   /* ===== レスポンシブ対応（スマホ向け） =====
      画面幅が640px以下のときだけ、以下のスタイルで上書きする（メディアクエリ）。
      卓カードを1列にしたり、ボタンを2列グリッドにしたりして指で操作しやすくする。 */
@@ -226,9 +243,35 @@
      ・#modal #toast  … 確認ダイアログ・通知（自前実装。理由は後述）
      id 付きの要素は、JS側から $("id") で掴んで中身を書き換える「差し込み口」。
      ============================================================ -->
+<!-- ============================================================
+     入り口（合言葉）画面。起動時は最前面でメイン画面を覆い、合言葉を入れて
+     「入る」を押すとメイン画面へ進む。同じ合言葉どうしで保存した大会を共有できる。
+     id付き要素はJSが掴んで開閉・一覧描画する差し込み口。
+     ============================================================ -->
+<div id="roomGate" class="gate">
+  <div class="gate-card">
+    <h1>🀄 麻雀 対戦表メーカー</h1>
+    <p class="lead">合言葉（部屋名）を入力して入室してください。<br>同じ合言葉を使う仲間と、保存した大会を共有できます。</p>
+    <label for="gateInput">合言葉</label>
+    <input id="gateInput" type="text" placeholder="例）toshigaku-mahjong" maxlength="40" autocomplete="off">
+    <button class="btn-main" id="gateEnter">この合言葉で入る ▶</button>
+    <div class="gate-recent" id="gateRecent" style="display:none">
+      <div class="rec-ttl">最近使った合言葉</div>
+      <div class="gate-chips" id="gateChips"></div>
+    </div>
+    <div class="gate-note">⚠ 合言葉は半角の英数字・ハイフン・アンダースコア（1〜40文字）。<br>合言葉ごとに別々の大会一覧になります。仲間と同じ合言葉を使えば共有でき、後から入り口に戻っていつでも切り替えられます。</div>
+  </div>
+</div>
+
 <header>
-  <h1>🀄 麻雀 対戦表メーカー＆点数入力</h1>
-  <p>抜け番を均等に回しつつ均等な組み合わせを生成。点棒を入れるとオカ・ウマ込みのスコアを自動計算します。</p>
+  <div class="head-top">
+    <div>
+      <h1>🀄 麻雀 対戦表メーカー＆点数入力</h1>
+      <p>抜け番を均等に回しつつ均等な組み合わせを生成。点棒を入れるとオカ・ウマ込みのスコアを自動計算します。</p>
+    </div>
+    <!-- 現在の部屋名を表示。クリックで入り口（合言葉）画面に戻って切り替えられる。 -->
+    <button class="room-btn" id="roomBtn" title="合言葉を変更（入り口に戻る）">🚪 <b id="roomLabel"></b><span>を変更</span></button>
+  </div>
 </header>
 
 <div class="wrap">
@@ -281,9 +324,23 @@
   <div id="error"></div>
   <div id="note"></div>
 
+  <!-- ===== 保存した大会（インライン一覧。デフォルトは開いた状態） =====
+       以前はモーダルで開いていたが、メイン画面に常設の折りたたみパネルとして表示する。
+       上の欄に名前を入れて保存、下の一覧から読み込み・削除できる。
+       データはクラウド(Firestore)の rooms/{合言葉}/tournaments に入る（端末を変えても残る）。 -->
+  <details class="collapse" id="libBox" open>
+    <summary>📚 保存した大会<span class="brief" id="libBrief"></span></summary>
+    <div class="lib-inline">
+      <div class="lib-save">
+        <input id="libName" type="text" placeholder="保存名（例：6月度大会）" maxlength="40">
+        <button class="btn-main" id="libSaveBtn">現在の大会を保存</button>
+      </div>
+      <div id="libList" class="lib-list"></div>
+    </div>
+  </details>
+
   <!-- 生成前は隠しておき（display:none）、対戦表ができたらJSが表示する -->
   <div class="actions" id="actions" style="display:none">
-    <button class="btn-sub" id="libMng">📚 大会を保存・呼び出し</button>
     <button class="btn-sub" id="clearScores">点数をクリア</button>
     <button class="btn-sub" id="regen">別の組み合わせで再生成</button>
     <span class="saved" id="savedMsg">✓ 自動保存しました</span>
@@ -316,27 +373,6 @@
 <div class="modal-bg" id="modal"><div class="modal"><div class="msg" id="modalMsg"></div>
   <div class="mbtns"><button class="btn-sub" id="modalNo">いいえ</button><button class="btn-main" id="modalYes">はい</button></div></div></div>
 <div id="toast"></div>
-
-<!-- 保存した大会の一覧（ライブラリ）。名前を付けて保存し、ここから読み込み・削除する。
-     データはクラウド(Firestore)の rooms/{合言葉}/tournaments に入る（端末を変えても残る）。 -->
-<div class="modal-bg" id="libModal"><div class="modal lib-modal">
-  <div class="lib-head"><strong>📚 保存した大会</strong><button class="btn-sub lib-x" id="libClose">閉じる</button></div>
-  <!-- 現在の部屋（合言葉）の表示と変更。data自体はクラウドの rooms/{合言葉}/ に入る。 -->
-  <div class="lib-room">
-    <span class="lib-room-now">部屋（合言葉）：<b id="libRoomCur"></b></span>
-    <button class="btn-sub lib-room-btn" id="libRoomToggle">変更</button>
-    <div id="libRoomEditor" class="lib-room-editor" style="display:none">
-      <input id="libRoomInput" type="text" placeholder="合言葉（半角英数字・ハイフン）" maxlength="40">
-      <button class="btn-main" id="libRoomSwitch">この部屋に切替</button>
-      <div class="lib-room-note">⚠ 部屋を切り替えると別の大会一覧に変わります（前の部屋のデータは消えません。同じ合言葉に戻せば再表示）。同じ合言葉を仲間で使えば共有できます。</div>
-    </div>
-  </div>
-  <div class="lib-save">
-    <input id="libName" type="text" placeholder="保存名（例：6月度大会）" maxlength="40">
-    <button class="btn-main" id="libSaveBtn">現在の大会を保存</button>
-  </div>
-  <div id="libList" class="lib-list"></div>
-</div></div>
 
 <!-- ============================================================
      Firebase（Googleのクラウド）SDKの読み込み。
@@ -1051,7 +1087,7 @@ async function loadFromLibrary(key){
   const apply=()=>{
     // loadState は保存データ d と点数 sc から current を組み立てる共通処理。
     loadState({id:key,P:e.P,G:pl.G,names:pl.names,rounds:pl.rounds,settings:pl.settings}, pl.scores||{});
-    closeLib();uiToast(`「${e.name}」を読み込みました`);
+    uiToast(`「${e.name}」を読み込みました`);
   };
   if(hasScores()) uiConfirm("現在入力中の点数は失われます。読み込みますか？",apply); else apply();
 }
@@ -1066,14 +1102,17 @@ function deleteFromLibrary(key,name){
 async function renderLibList(){
   const box=$("libList");
   box.innerHTML='<div class="lib-empty">読み込み中…</div>';
+  $("libBrief").textContent="読み込み中…";
   let docs;
   try{
     const snap=await libCol().get();
     docs=snap.docs.map(d=>Object.assign({key:d.id},d.data()));
   }catch(e){
-    box.innerHTML='<div class="lib-empty">一覧を取得できませんでした。<br>インターネット接続と、Firebaseの「セキュリティルール」設定をご確認ください。</div>';return;
+    box.innerHTML='<div class="lib-empty">一覧を取得できませんでした。<br>インターネット接続と、Firebaseの「セキュリティルール」設定をご確認ください。</div>';
+    $("libBrief").textContent="取得できませんでした";return;
   }
   docs.sort((a,b)=>String(b.savedAt||"").localeCompare(String(a.savedAt||"")));
+  $("libBrief").textContent=`合言葉「${ROOM}」・${docs.length}件`;   // 折りたたみ見出しの要約
   if(!docs.length){box.innerHTML='<div class="lib-empty">まだ保存された大会はありません。<br>上の欄に名前を入れて「現在の大会を保存」を押すと、ここに一覧表示され、どの端末からでも読み込めます。</div>';return;}
   box.innerHTML=docs.map(e=>{
     const d=new Date(e.savedAt);                              // 保存日時を「2026/6/28 14:05」の形に整形
@@ -1086,23 +1125,45 @@ async function renderLibList(){
       `<button class="btn-sub lib-del" data-key="${esc(e.key)}" data-name="${esc(e.name)}">削除</button></div></div>`;
   }).join("");
 }
-// 現在の部屋（合言葉）名を画面に表示する
-function refreshRoomLabel(){$("libRoomCur").textContent=ROOM;}
-// 部屋（合言葉）を切り替える。検証→ROOM更新→端末に記憶→一覧を取り直す。
-function switchRoom(name){
+// 現在の部屋（合言葉）名をヘッダーのボタンに表示する
+function refreshRoomLabel(){$("roomLabel").textContent=ROOM;}
+
+// ===== 入り口（合言葉）画面 =====
+// この端末で最近使った合言葉をlocalStorageに最大6件まで覚えておき、入り口でワンタップ選択できる。
+const RECENT_KEY="mahjong_rooms_recent";
+function getRecentRooms(){try{const a=JSON.parse(localStorage.getItem(RECENT_KEY)||"[]");return Array.isArray(a)?a:[];}catch(e){return [];}}
+function pushRecentRoom(name){
+  let a=getRecentRooms().filter(r=>r!==name);   // 同じ名前は一旦除いて…
+  a.unshift(name);                               // 先頭（最新）に入れ直す
+  a=a.slice(0,6);                                // 最大6件まで
+  try{localStorage.setItem(RECENT_KEY,JSON.stringify(a));}catch(e){}
+}
+// 入り口画面を表示する。入力欄に今の部屋名を入れ、最近使った合言葉をチップで並べる。
+function showGate(){
+  $("gateInput").value=ROOM;
+  const recent=getRecentRooms().filter(r=>r!==ROOM);   // 今の部屋は重複表示しない
+  if(recent.length){
+    $("gateChips").innerHTML=recent.map(r=>`<button type="button" class="gate-chip" data-room="${esc(r)}">${esc(r)}</button>`).join("");
+    $("gateRecent").style.display="";
+  }else{$("gateRecent").style.display="none";}
+  $("roomGate").style.display="flex";
+  // 入力欄にフォーカスし全選択（すぐ打ち替えられるように）。描画後に実行。
+  setTimeout(()=>{const i=$("gateInput");i.focus();i.select();},0);
+}
+// 合言葉を確定してメイン画面へ入る。検証→ROOM更新→端末に記憶→最近一覧へ→入り口を閉じて一覧表示。
+function enterRoom(name){
   name=(name||"").trim();
   // Firestoreのパス名として安全な文字に限定（半角英数・ハイフン・アンダースコア、1〜40文字）。
   if(!/^[A-Za-z0-9_-]{1,40}$/.test(name)){uiToast("合言葉は半角の英数字・ハイフン・アンダースコア（1〜40文字）で入力してください");return;}
-  $("libRoomEditor").style.display="none";
-  if(name===ROOM){refreshRoomLabel();return;}            // 同じなら何もしない
+  const changed=(name!==ROOM);
   ROOM=name;
   try{localStorage.setItem(ROOM_KEY,ROOM);}catch(e){}     // この端末に記憶（次回もこの部屋で開く）
-  refreshRoomLabel();renderLibList();                     // 新しい部屋の一覧に切り替え
-  uiToast(`部屋「${ROOM}」に切り替えました`);
+  pushRecentRoom(ROOM);
+  refreshRoomLabel();
+  $("roomGate").style.display="none";                    // 入り口を閉じてメイン画面へ
+  renderLibList();                                       // この部屋の保存一覧を表示
+  if(changed)uiToast(`合言葉「${ROOM}」で入室しました`);
 }
-// ライブラリモーダルを開く（部屋名表示・編集欄は畳む・名前欄を空にして最新の一覧を表示）／閉じる
-function openLib(){$("libName").value="";refreshRoomLabel();$("libRoomEditor").style.display="none";renderLibList();$("libModal").style.display="flex";}
-function closeLib(){$("libModal").style.display="none";}
 
 
 // ===== 各ボタンの動作を割り当て =====
@@ -1112,27 +1173,22 @@ function doGen(){if(generate((Math.random()*1e9)>>>0))setCfg(false);}
 $("gen").onclick=()=>{if(hasScores())uiConfirm("新しく生成すると、入力した点数は失われます。よろしいですか？",doGen);else doGen();};
 $("regen").onclick=()=>{if(hasScores())uiConfirm("再生成すると、入力した点数は失われます。よろしいですか？",doGen);else doGen();};
 $("clearScores").onclick=()=>{if(!hasScores())return;uiConfirm("入力した点数をすべてクリアします。よろしいですか？",()=>{scores={};saveScores(true);render();uiToast("点数をクリアしました");});};
-// 大会ライブラリ（ブラウザ内保存）の各操作を割り当て
-$("libMng").onclick=openLib;                         // 「📚 大会を保存・呼び出し」でモーダルを開く
-$("libClose").onclick=closeLib;
+// 大会ライブラリ（インライン一覧）の各操作を割り当て
 $("libSaveBtn").onclick=()=>saveCurrentToLibrary($("libName").value);
 // 名前欄でEnterを押しても保存できるように
 $("libName").addEventListener("keydown",e=>{if(e.key==="Enter")saveCurrentToLibrary($("libName").value);});
-// 部屋（合言葉）の「変更」ボタンで入力欄を開閉。開くときは今の部屋名を入れてフォーカス。
-$("libRoomToggle").onclick=()=>{
-  const ed=$("libRoomEditor"),show=ed.style.display==="none";
-  ed.style.display=show?"flex":"none";
-  if(show){$("libRoomInput").value=ROOM;$("libRoomInput").focus();$("libRoomInput").select();}
-};
-$("libRoomSwitch").onclick=()=>switchRoom($("libRoomInput").value);
-$("libRoomInput").addEventListener("keydown",e=>{if(e.key==="Enter")switchRoom($("libRoomInput").value);});
 // 一覧内の「読み込み」「削除」ボタンを1か所で受ける（イベント委譲）。data-keyで対象を特定。
 $("libList").addEventListener("click",e=>{
   const ld=e.target.closest(".lib-load");if(ld){loadFromLibrary(ld.dataset.key);return;}
   const dl=e.target.closest(".lib-del");if(dl){deleteFromLibrary(dl.dataset.key,dl.dataset.name);return;}
 });
-// モーダルの背景（外側）クリックで閉じる
-$("libModal").addEventListener("click",e=>{if(e.target===$("libModal"))closeLib();});
+// ===== 入り口（合言葉）画面の操作を割り当て =====
+$("gateEnter").onclick=()=>enterRoom($("gateInput").value);           // 「入る」で入室
+$("gateInput").addEventListener("keydown",e=>{if(e.key==="Enter")enterRoom($("gateInput").value);});  // Enterでも入室
+// 最近使った合言葉チップをクリックしたら、その合言葉で入室
+$("gateChips").addEventListener("click",e=>{const c=e.target.closest(".gate-chip");if(c)enterRoom(c.dataset.room);});
+// ヘッダーの部屋名ボタンで入り口（合言葉）画面に戻る
+$("roomBtn").onclick=showGate;
 // 印刷の直前は折りたたみ(details)を一時的に全部開き（中身も印刷されるように）、印刷後に元に戻す。
 // d.dataset.w に「元が開いていたか(1/0)」を覚えておく。
 window.addEventListener("beforeprint",()=>document.querySelectorAll("details.collapse").forEach(d=>{d.dataset.w=d.open?"1":"0";d.open=true;}));
@@ -1155,6 +1211,10 @@ function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;","
 // ===== 起動処理（ページ読み込み時に一度だけ実行される） =====
 applySettingsToInputs();                    // 設定欄に初期値を表示
 if(!restore()) generate(12345);             // 前回データがあれば復元、無ければ固定の種で初期表示を作る
+refreshRoomLabel();                         // ヘッダーの部屋名を表示
+// 入り口（合言葉）画面を最前面に出す。メイン画面は背後で準備済み。
+// 合言葉を入れて「入る」と入り口が閉じ、その部屋の保存一覧が読み込まれる。
+showGate();
 </script>
 </body>
 </html>
