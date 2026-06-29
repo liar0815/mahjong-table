@@ -142,7 +142,10 @@
   details.collapse>summary::-webkit-details-marker{display:none}
   details.collapse>summary::before{content:"▸";color:var(--muted);display:inline-block;transition:transform .15s}
   details.collapse[open]>summary::before{transform:rotate(90deg)}
-  details.collapse>summary .brief{color:var(--muted);font-weight:400;font-size:12px;margin-left:auto;text-align:right}
+  details.collapse>summary .brief{color:var(--muted);font-weight:400;font-size:12px;margin-left:auto;text-align:right;
+    white-space:nowrap;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  /* 見出しタイトルは語中で折り返さない（「保存した大\n会」を防ぐ）。長い注記は brief 側で省略する。 */
+  details.collapse>summary .sum-ttl{white-space:nowrap;flex:0 0 auto}
   details.collapse .stats{margin:0;padding:0 14px 14px}
   details.collapse #standings{padding:0 14px 14px}
   details.collapse #rounds{padding:8px 14px 6px}
@@ -253,7 +256,7 @@
     <h1>🀄 麻雀 対戦表メーカー</h1>
     <p class="lead">合言葉（部屋名）を入力して入室してください。<br>同じ合言葉を使う仲間と、保存した大会を共有できます。</p>
     <label for="gateInput">合言葉</label>
-    <input id="gateInput" type="text" placeholder="例）toshigaku-mahjong" maxlength="40" autocomplete="off">
+    <input id="gateInput" type="text" placeholder="例）sample-room" maxlength="40" autocomplete="off">
     <button class="btn-main" id="gateEnter">この合言葉で入る ▶</button>
     <div class="gate-recent" id="gateRecent" style="display:none">
       <div class="rec-ttl">最近使った合言葉</div>
@@ -275,6 +278,21 @@
 </header>
 
 <div class="wrap">
+  <!-- ===== 保存した大会（インライン一覧。最上部・デフォルトは開いた状態） =====
+       以前はモーダルで開いていたが、メイン画面の一番上に常設の折りたたみパネルとして表示する。
+       上の欄に名前を入れて保存、下の一覧から読み込み・削除できる。
+       データはクラウド(Firestore)の rooms/{合言葉}/tournaments に入る（端末を変えても残る）。 -->
+  <details class="collapse" id="libBox" open>
+    <summary><span class="sum-ttl">📚 保存した大会</span><span class="brief" id="libBrief"></span></summary>
+    <div class="lib-inline">
+      <div class="lib-save">
+        <input id="libName" type="text" placeholder="保存名（例：6月度大会）" maxlength="40">
+        <button class="btn-main" id="libSaveBtn">現在の大会を保存</button>
+      </div>
+      <div id="libList" class="lib-list"></div>
+    </div>
+  </details>
+
   <button id="cfgToggle" class="cfg-toggle">⚙ 設定（人数・試合数・スコアルール）<span id="cfgChevron">▲</span></button>
   <div id="settingsWrap">
   <div class="panelbox controls">
@@ -323,21 +341,6 @@
   <!-- 中身が空の入れ物。JSがエラー文・注意文をここに流し込む -->
   <div id="error"></div>
   <div id="note"></div>
-
-  <!-- ===== 保存した大会（インライン一覧。デフォルトは開いた状態） =====
-       以前はモーダルで開いていたが、メイン画面に常設の折りたたみパネルとして表示する。
-       上の欄に名前を入れて保存、下の一覧から読み込み・削除できる。
-       データはクラウド(Firestore)の rooms/{合言葉}/tournaments に入る（端末を変えても残る）。 -->
-  <details class="collapse" id="libBox" open>
-    <summary>📚 保存した大会<span class="brief" id="libBrief"></span></summary>
-    <div class="lib-inline">
-      <div class="lib-save">
-        <input id="libName" type="text" placeholder="保存名（例：6月度大会）" maxlength="40">
-        <button class="btn-main" id="libSaveBtn">現在の大会を保存</button>
-      </div>
-      <div id="libList" class="lib-list"></div>
-    </div>
-  </details>
 
   <!-- 生成前は隠しておき（display:none）、対戦表ができたらJSが表示する -->
   <div class="actions" id="actions" style="display:none">
@@ -1112,7 +1115,7 @@ async function renderLibList(){
     $("libBrief").textContent="取得できませんでした";return;
   }
   docs.sort((a,b)=>String(b.savedAt||"").localeCompare(String(a.savedAt||"")));
-  $("libBrief").textContent=`合言葉「${ROOM}」・${docs.length}件`;   // 折りたたみ見出しの要約
+  $("libBrief").textContent=`${docs.length}件`;   // 折りたたみ見出しの要約（部屋名はヘッダーに表示済み）
   if(!docs.length){box.innerHTML='<div class="lib-empty">まだ保存された大会はありません。<br>上の欄に名前を入れて「現在の大会を保存」を押すと、ここに一覧表示され、どの端末からでも読み込めます。</div>';return;}
   box.innerHTML=docs.map(e=>{
     const d=new Date(e.savedAt);                              // 保存日時を「2026/6/28 14:05」の形に整形
