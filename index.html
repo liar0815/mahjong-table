@@ -517,9 +517,12 @@ function buildSchedule(P,R,T,Bpr,seed){
   const counts=new Int32Array(P*P);               // 各ペアが同卓した回数。Int32Arrayは高速な整数配列
   const byeCount=new Int32Array(P);               // 各プレイヤーが抜け番になった累計回数
   let prevBye=new Set();                          // 直前の戦で抜け番だった人の集合（連続を避けるため）
-  // ある卓の「不均等さ(コスト)」の増減を計算。卓内の6ペアそれぞれについて、
-  // すでにc回当たっているなら2c+1だけコスト増（＝既に多く当たっている人同士を避けたい）。
-  // 卓を足すとき(sign>0)は +(2c+1)、抜くとき(sign<0)は -(2c+1) を合計する。
+  // ある卓を置く／外したときの「不均等さ(コスト)」の増減を計算する。
+  // コストは全ペアの「対戦回数の二乗和 Σc²」と定義する（偏るほど二乗で効くので大きくなる）。
+  // 卓内の6ペアそれぞれについて、いま c 回当たっている人同士なら…
+  //   足すとき(sign>0): c→c+1 で Σc² は +(2c+1) 増える
+  //   抜くとき(sign<0): c→c-1 で Σc² は -(2c-1) 減る（＝ -2c+1）
+  // この増減を6ペアぶん合計して返す。すでに多く当たっている組ほど足すコストが高い＝避けたい。
   function tableCostDelta(tbl,sign){let d=0;for(let i=0;i<4;i++)for(let j=i+1;j<4;j++){const c=counts[pairIdx(tbl[i],tbl[j])];d+=sign>0?(2*c+1):(-2*c+1);}return d;}
   // 卓の6ペアの対戦回数を実際に+1（sign=1）または-1（sign=-1）する。仮置き／取り消しに使う。
   function applyTable(tbl,sign){for(let i=0;i<4;i++)for(let j=i+1;j<4;j++) counts[pairIdx(tbl[i],tbl[j])]+=sign;}
@@ -564,8 +567,11 @@ function buildSchedule(P,R,T,Bpr,seed){
       // 入れ替え後のコストを測りつつ、両卓を再びcountsへ加える(+1)
       const a1=tableCostDelta(A,1);applyTable(A,1);
       const a2=tableCostDelta(B,1);applyTable(B,1);
-      // 悪化した(>0)場合、確率 exp(-悪化量/temp) でだけ許可。それ以外は↓で元に戻す。
-      if((a1+a2)-(b1+b2)>0 && rng()>Math.exp(-((a1+a2)-(b1+b2))/temp)){
+      // この入れ替えによる Σc²（偏り）の総変化 = 両卓を外した分(b1+b2)＋入れ直した分(a1+a2)。
+      // b1,b2 は「外したとき減る量」で負なので、4つを“足し合わせる”のが正味の増減。
+      // delta>0（悪化）のときだけ、確率 exp(-悪化量/temp) で許可。それ以外は↓で元に戻す。
+      const delta=(a1+a2)+(b1+b2);
+      if(delta>0 && rng()>Math.exp(-delta/temp)){
         applyTable(A,-1);applyTable(B,-1);[A[iA],B[iB]]=[B[iB],A[iA]];applyTable(A,1);applyTable(B,1);
       }
       temp*=0.9995;if(temp<0.05)temp=0.05;         // 少しずつ冷ます（下限0.05）
@@ -701,7 +707,7 @@ function generate(seed){
   // --- 複数回作って一番良い対戦表を採用する ---
   // buildScheduleは乱数頼りなので、種を変えて数回作り、評価キーが最小のものを選ぶ。
   let best=null,bestKey=null;
-  const tries=(P*R<=600)?6:3;                            // 小規模は6回、大規模は3回（時間との兼ね合い）
+  const tries=(P*R<=600)?12:6;                           // 種を変えて何回作るか。小規模は12回、大規模は6回（多いほど均等な候補に当たりやすい）
   for(let k=0;k<tries;k++){
     const res=buildSchedule(P,R,T,Bpr,(seed*1000+k*97+13)>>>0);  // 毎回ちがう種で生成
     const st=deriveStats(res.rounds,P);
@@ -1216,7 +1222,9 @@ function addRound(){
     const b1=tableCostDelta(A,-1);applyTable(A,-1);const b2=tableCostDelta(B,-1);applyTable(B,-1);
     [A[iA],B[iB]]=[B[iB],A[iA]];
     const a1=tableCostDelta(A,1);applyTable(A,1);const a2=tableCostDelta(B,1);applyTable(B,1);
-    if((a1+a2)-(b1+b2)>0 && rng()>Math.exp(-((a1+a2)-(b1+b2))/temp)){
+    // 偏り(Σc²)の正味の増減 = (a1+a2)+(b1+b2)。b1,b2は外したとき減る負の値なので足し合わせる。
+    const delta=(a1+a2)+(b1+b2);
+    if(delta>0 && rng()>Math.exp(-delta/temp)){
       applyTable(A,-1);applyTable(B,-1);[A[iA],B[iB]]=[B[iB],A[iA]];applyTable(A,1);applyTable(B,1);
     }
     temp*=0.9995;if(temp<0.05)temp=0.05;
