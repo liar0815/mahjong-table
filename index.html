@@ -313,8 +313,8 @@
     </div>
   </details>
 
-  <button id="cfgToggle" class="cfg-toggle">⚙ 設定（人数・試合数・スコアルール）<span id="cfgChevron">▲</span></button>
-  <div id="settingsWrap">
+  <button id="cfgToggle" class="cfg-toggle">⚙ 設定（人数・試合数・スコアルール）<span id="cfgChevron">▼</span></button>
+  <div id="settingsWrap" style="display:none">
   <div class="panelbox controls">
     <div class="row">
       <div class="field">
@@ -1260,7 +1260,7 @@ $("rounds").addEventListener("click",e=>{
 });
 
 // ===== 設定パネルの折りたたみ =====
-let cfgOpen=true;                            // 設定欄が開いているか
+let cfgOpen=false;                           // 設定欄が開いているか（初期表示は閉じておく）
 function setCfg(open){cfgOpen=open;$("settingsWrap").style.display=open?"":"none";$("cfgChevron").textContent=open?"▲":"▼";}
 $("cfgToggle").onclick=()=>setCfg(!cfgOpen); // ⚙ボタンで開閉トグル
 // ===== スコアルールの変更 =====
