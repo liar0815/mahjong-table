@@ -133,7 +133,7 @@
   .sw{width:12px;height:12px;border-radius:3px;display:inline-block}
   .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;align-items:center;justify-content:center;padding:20px}
   /* 確認ダイアログ(#modal)は、ライブラリ等ほかのモーダルより前面に出す（重なっても隠れないように）。 */
-  #modal{z-index:80}
+  #modal{z-index:95}
   .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;max-width:360px;width:100%}
   .modal .msg{font-size:14px;margin-bottom:16px}
   .modal .mbtns{display:flex;gap:10px;justify-content:flex-end}
@@ -203,12 +203,42 @@
     border-radius:999px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer}
   .gate-chip:hover{background:var(--chip);border-color:var(--accent);color:var(--accent2)}
   .gate-note{margin-top:18px;font-size:11px;color:var(--muted);line-height:1.7}
-  /* メイン画面ヘッダー内の「部屋（合言葉）変更」ボタン */
+  /* メイン画面ヘッダー内のボタン */
   .room-btn{background:var(--panel2);border:1px solid var(--line);color:var(--txt);
     border-radius:999px;padding:6px 14px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
   .room-btn:hover{background:var(--chip);border-color:var(--accent)}
   .room-btn b{color:var(--accent2)}
   header .head-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+  /* ===== ログイン画面 ===== */
+  .btn-google{display:flex;align-items:center;gap:12px;background:#fff;color:#3c4043;border:1px solid #dadce0;
+    border-radius:8px;padding:12px 16px;font-size:15px;font-weight:600;width:100%;margin-top:14px;
+    cursor:pointer;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .btn-google:hover{background:#f8f9fa;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+  .login-spinner{text-align:center;padding:24px;color:var(--muted);font-size:13px}
+  /* ===== 部屋選択画面 ===== */
+  .gate-user-row{display:flex;align-items:center;gap:10px;padding:12px;background:var(--panel2);
+    border-radius:10px;margin-bottom:16px;border:1px solid var(--line)}
+  .gate-section{margin-bottom:16px}
+  .gate-section-title{font-size:12px;color:var(--muted);font-weight:600;margin-bottom:8px;letter-spacing:.04em}
+  .gate-input-row{display:flex;gap:8px}
+  .gate-input-row input{flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);color:var(--txt);
+    border-radius:8px;padding:10px 12px;font-size:14px}
+  .gate-input-row input:focus{outline:none;border-color:var(--accent)}
+  /* 部屋選択画面のボタンは .gate-card .btn-main{width:100%} の上書きが必要 */
+  .gate-input-row .btn-main{width:auto;margin-top:0;padding:10px 16px;font-size:14px;flex:0 0 auto;white-space:nowrap}
+  .my-rooms-list{max-height:30vh;overflow:auto;display:flex;flex-direction:column;gap:8px}
+  .my-room-item{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;
+    padding:10px 12px;background:var(--panel2)}
+  .my-room-item:hover{background:#d6e8db;border-color:var(--accent)}
+  .my-room-item .btn-main{width:auto;margin-top:0;padding:7px 14px;font-size:13px;flex:0 0 auto;white-space:nowrap}
+  /* ===== メンバー管理モーダル ===== */
+  .member-item{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:8px;
+    padding:8px 12px;background:var(--panel2)}
+  .invite-code-box{padding:12px;background:var(--panel2);border-radius:10px;border:1px solid var(--line);margin-bottom:16px}
+  .invite-code-display{font-size:24px;font-weight:700;letter-spacing:4px;font-family:monospace;
+    padding:8px 12px;background:var(--panel);border:1px solid var(--line);border-radius:8px;display:inline-block}
+  /* ===== ヘッダー右側 ===== */
+  .head-right{display:flex;gap:6px;align-items:center;flex-wrap:wrap;flex:0 0 auto}
   /* インライン「保存した大会」パネルの中身の余白 */
   details.collapse .lib-inline{padding:0 14px 14px}
   /* ===== レスポンシブ対応（スマホ向け） =====
@@ -267,22 +297,51 @@
      id 付きの要素は、JS側から $("id") で掴んで中身を書き換える「差し込み口」。
      ============================================================ -->
 <!-- ============================================================
-     入り口（合言葉）画面。起動時は最前面でメイン画面を覆い、合言葉を入れて
-     「入る」を押すとメイン画面へ進む。同じ合言葉どうしで保存した大会を共有できる。
-     id付き要素はJSが掴んで開閉・一覧描画する差し込み口。
+     ログイン画面。未ログイン時に最前面で表示。
+     Firebase Auth の状態確認中はスピナーを出し、未ログインと判明したらログインボタンを表示。
      ============================================================ -->
-<div id="roomGate" class="gate">
+<div id="loginGate" class="gate">
   <div class="gate-card">
     <h1>🀄 麻雀 対戦表メーカー</h1>
-    <p class="lead">合言葉（部屋名）を入力して入室してください。<br>同じ合言葉を使う仲間と、保存した大会を共有できます。</p>
-    <label for="gateInput">合言葉</label>
-    <input id="gateInput" type="text" placeholder="例）sample-room" maxlength="40" autocomplete="off">
-    <button class="btn-main" id="gateEnter">この合言葉で入る ▶</button>
-    <div class="gate-recent" id="gateRecent" style="display:none">
-      <div class="rec-ttl">最近使った合言葉</div>
-      <div class="gate-chips" id="gateChips"></div>
+    <div id="loginSpinner" class="login-spinner">認証情報を確認中…</div>
+    <div id="loginContent" style="display:none">
+      <p class="lead">Googleアカウントでログインして始めましょう。<br>部屋を作って仲間を招待すると、みんなで大会データを共有できます。</p>
+      <button class="btn-google" id="loginBtn">
+        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" width="20" height="20">
+        Googleでログイン
+      </button>
+      <div class="gate-note">ログインにはGoogleアカウントが必要です。パスワードはこのアプリに送信されません。</div>
     </div>
-    <div class="gate-note">⚠ 合言葉は半角の英数字・ハイフン・アンダースコア（1〜40文字）。<br>合言葉ごとに別々の大会一覧になります。仲間と同じ合言葉を使えば共有でき、後から入り口に戻っていつでも切り替えられます。</div>
+  </div>
+</div>
+
+<!-- ============================================================
+     部屋選択画面。ログイン済みで部屋未選択のときに表示。
+     部屋の新規作成・招待コードで参加・自分の部屋一覧を操作できる。
+     ============================================================ -->
+<div id="roomSelectGate" class="gate" style="display:none">
+  <div class="gate-card" style="max-width:520px">
+    <div id="gateUserRow" class="gate-user-row"><!-- JSが描画 --></div>
+    <div class="gate-section">
+      <div class="gate-section-title">部屋を新規作成</div>
+      <div class="gate-input-row">
+        <input id="newRoomName" type="text" placeholder="部屋の名前（例：東学麻雀部）" maxlength="40" autocomplete="off">
+        <button class="btn-main" id="createRoomBtn">作成</button>
+      </div>
+    </div>
+    <div class="gate-section">
+      <div class="gate-section-title">招待コードで参加</div>
+      <div class="gate-input-row">
+        <input id="inviteCodeInput" type="text" placeholder="8文字のコードを入力" maxlength="8" autocomplete="off" style="text-transform:uppercase;letter-spacing:2px;font-family:monospace;font-size:16px">
+        <button class="btn-main" id="joinByCodeBtn">参加</button>
+      </div>
+    </div>
+    <div class="gate-section">
+      <div class="gate-section-title">自分の部屋</div>
+      <div id="myRoomsList" class="my-rooms-list">
+        <div class="lib-empty">読み込み中…</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -292,8 +351,17 @@
       <h1>🀄 麻雀 対戦表メーカー＆点数入力</h1>
       <p>抜け番を均等に回しつつ均等な組み合わせを生成。点棒を入れるとオカ・ウマ込みのスコアを自動計算します。</p>
     </div>
-    <!-- 現在の部屋名を表示。クリックで入り口（合言葉）画面に戻って切り替えられる。 -->
-    <button class="room-btn" id="roomBtn" title="合言葉を変更（入り口に戻る）">🚪 <b id="roomLabel"></b><span>を変更</span></button>
+    <div class="head-right">
+      <!-- 現在の部屋名。クリックで部屋選択画面へ -->
+      <button class="room-btn" id="roomBtn" title="部屋を切り替える">🚪 <b id="roomLabel">—</b></button>
+      <!-- メンバー管理（招待コード・メンバー一覧） -->
+      <button class="room-btn" id="memberBtn" title="メンバー管理・招待コード">👥 メンバー</button>
+      <!-- ログイン中のユーザー名。クリックでログアウト -->
+      <button class="room-btn" id="userBtn" title="ログアウト">
+        <img id="userAvatar" src="" alt="" width="18" height="18" style="border-radius:50%;display:none;vertical-align:middle">
+        <span id="userNameLabel"></span>
+      </button>
+    </div>
   </div>
 </header>
 
@@ -392,8 +460,7 @@
     <div class="stats" id="stats"></div>
   </details>
   <details class="collapse" id="pstatBox">
-    <summary>📊 順位表・成績<span class="brief" id="pstatBrief"></span></summary>
-    <div style="text-align:right;margin:6px 0 2px"><button class="btn-sub" id="copyImg">📋 画像でコピー</button></div>
+    <summary>📊 順位表・成績<span class="brief" id="pstatBrief"></span><button class="btn-sub" id="copyImg" style="font-size:12px;padding:5px 10px;margin-left:8px;flex:0 0 auto">📋 画像でコピー</button></summary>
     <div id="pstats"></div>
   </details>
   <details class="collapse" id="roundsBox" open>
@@ -411,6 +478,35 @@
      見た目を自作してJSで開閉する。普段は modal-bg が display:none で隠れている。 -->
 <div class="modal-bg" id="modal"><div class="modal"><div class="msg" id="modalMsg"></div>
   <div class="mbtns"><button class="btn-sub" id="modalNo">いいえ</button><button class="btn-main" id="modalYes">はい</button></div></div></div>
+
+<!-- メンバー管理モーダル（z-index:85 で確認ダイアログより下・ゲート画面より下に配置） -->
+<div class="modal-bg" id="memberModal" style="z-index:85">
+  <div class="modal" style="max-width:480px;width:100%">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <b id="memberModalRoomName" style="font-size:15px"></b>
+      <button class="btn-sub" id="memberModalClose" style="padding:6px 12px;font-size:13px">✕ 閉じる</button>
+    </div>
+    <!-- 招待コード表示エリア（オーナー・メンバー共通で表示） -->
+    <div class="invite-code-box" id="memberModalInvite">
+      <div style="font-size:12px;color:var(--muted);font-weight:600;margin-bottom:10px">招待コード（仲間に伝えてください）</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span class="invite-code-display" id="memberModalCode"></span>
+        <button class="btn-sub" id="copyCodeBtn" style="padding:7px 12px;font-size:13px">コピー</button>
+        <button class="btn-sub" id="regenCodeBtn" style="padding:7px 12px;font-size:13px;display:none" title="再生成すると古いコードは使えなくなります">再生成</button>
+      </div>
+    </div>
+    <!-- メンバー一覧 -->
+    <div style="font-size:12px;color:var(--muted);font-weight:600;margin-bottom:8px">メンバー</div>
+    <div id="memberModalList" style="max-height:32vh;overflow:auto;display:flex;flex-direction:column;gap:6px"></div>
+    <!-- 旧データ引き継ぎ・退出・削除ボタン -->
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn-sub" id="migrateBtn" style="color:var(--accent);border-color:var(--accent)" title="旧合言葉方式で保存したデータをこの部屋に引き継ぎます">旧データを引き継ぐ</button>
+      <button class="btn-sub" id="leaveRoomBtn" style="color:var(--warn);border-color:var(--warn)">この部屋から退出する</button>
+      <button class="btn-sub" id="deleteRoomBtn" style="color:var(--bad);border-color:var(--bad);display:none">部屋を削除する</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <!-- ============================================================
@@ -422,6 +518,7 @@
      ※ これらは下の本体<script>より前に置くこと（先に読み込ませる）。
      ============================================================ -->
 <script src="https://www.gstatic.com/firebasejs/11.0.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.0.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore-compat.js"></script>
 <script>
 /* ===== Firebase 接続設定（このプロジェクト固有の宛先情報） =====
@@ -435,19 +532,20 @@ const firebaseConfig = {
   messagingSenderId: "769151958759",
   appId: "1:769151958759:web:946d97dbe98be35a3a6c42"
 };
-/* ★合言葉（部屋名）★
-   仲間内でデータを共有するための“部屋の名前”。同じ合言葉のアプリ同士が同じ一覧を見る。
-   ・DEFAULT_ROOM … 初期値（この端末でまだ部屋を選んでいないときに使う既定の合言葉）
-   ・ROOM         … 現在使っている部屋。画面の「📚」内からいつでも変更でき、選んだ値は
-                    その端末に記憶される（ROOM_KEY）。letなので実行中に書き換わる。 */
-const DEFAULT_ROOM = "toshigaku-mahjong";
-const ROOM_KEY = "mahjong_room";
-let ROOM = localStorage.getItem(ROOM_KEY) || DEFAULT_ROOM;
-// Firebaseを起動し、Firestore（データベース）への接続dbを用意する。
+// Firebaseを起動し、認証(auth)とデータベース(db)の接続を用意する。
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
-// このアプリのデータの保存場所：rooms/{合言葉}/tournaments/{大会ID} のコレクション。
-function libCol(){return db.collection("rooms").doc(ROOM).collection("tournaments");}
+const auth = firebase.auth();
+
+// ログイン中のユーザーと選択中の部屋を保持する変数。
+// 両方揃って初めてメイン画面が使える。
+let currentUser = null;      // Firebase Auth ユーザーオブジェクト
+let currentRoomId = null;    // 選択中の部屋の Firestore ドキュメント ID
+let currentRoomData = null;  // 選択中の部屋のデータ（name, members 等）
+const ROOM_ID_KEY = 'mahjong_room_id_v3';  // localStorage に部屋IDを保存するキー
+
+// 大会データの保存先コレクション。currentRoomId が必要。
+function libCol(){return db.collection('rooms').doc(currentRoomId).collection('tournaments');}
 </script>
 
 <script>
@@ -568,7 +666,7 @@ function buildSchedule(P,R,T,Bpr,seed){
       const a1=tableCostDelta(A,1);applyTable(A,1);
       const a2=tableCostDelta(B,1);applyTable(B,1);
       // この入れ替えによる Σc²（偏り）の総変化 = 両卓を外した分(b1+b2)＋入れ直した分(a1+a2)。
-      // b1,b2 は「外したとき減る量」で負なので、4つを“足し合わせる”のが正味の増減。
+      // b1,b2 は「外したとき減る量」で負なので、4つを"足し合わせる"のが正味の増減。
       // delta>0（悪化）のときだけ、確率 exp(-悪化量/temp) で許可。それ以外は↓で元に戻す。
       const delta=(a1+a2)+(b1+b2);
       if(delta>0 && rng()>Math.exp(-delta/temp)){
@@ -1213,7 +1311,7 @@ $("rounds").addEventListener("click",e=>{
 
 // ===== 対戦の追加・削除 =====
 // 既存の対戦表の「続き」を1戦だけ追加する。
-// buildSchedule（最初から全戦作る関数）とほぼ同じ手順だが、ここでは“今までの履歴”を
+// buildSchedule（最初から全戦作る関数）とほぼ同じ手順だが、ここでは"今までの履歴"を
 // 引き継いだ状態から始める点が違う。なのでまず deriveStats で過去の集計を取り出す。
 function addRound(){
   const {P,T,Bpr,rounds}=current;
@@ -1373,6 +1471,7 @@ function deleteFromLibrary(key,name){
 }
 // 一覧をクラウドから取得して #libList に描画する。新しい保存が上に来るよう日時で降順ソート。
 async function renderLibList(){
+  if(!currentRoomId) return;
   const box=$("libList");
   box.innerHTML='<div class="lib-empty">読み込み中…</div>';
   $("libBrief").textContent="読み込み中…";
@@ -1398,48 +1497,6 @@ async function renderLibList(){
       `<button class="btn-sub lib-del" data-key="${esc(e.key)}" data-name="${esc(e.name)}">削除</button></div></div>`;
   }).join("");
 }
-// 現在の部屋（合言葉）名をヘッダーのボタンに表示する
-function refreshRoomLabel(){$("roomLabel").textContent=ROOM;}
-
-// ===== 入り口（合言葉）画面 =====
-// この端末で最近使った合言葉をlocalStorageに最大6件まで覚えておき、入り口でワンタップ選択できる。
-const RECENT_KEY="mahjong_rooms_recent";
-function getRecentRooms(){try{const a=JSON.parse(localStorage.getItem(RECENT_KEY)||"[]");return Array.isArray(a)?a:[];}catch(e){return [];}}
-function pushRecentRoom(name){
-  let a=getRecentRooms().filter(r=>r!==name);   // 同じ名前は一旦除いて…
-  a.unshift(name);                               // 先頭（最新）に入れ直す
-  a=a.slice(0,6);                                // 最大6件まで
-  try{localStorage.setItem(RECENT_KEY,JSON.stringify(a));}catch(e){}
-}
-// 入り口画面を表示する。入力欄に今の部屋名を入れ、最近使った合言葉をチップで並べる。
-function showGate(){
-  // この端末で過去に合言葉を使っていれば前回の部屋名を初期表示、初回（履歴なし）は空欄にする。
-  $("gateInput").value=localStorage.getItem(ROOM_KEY)?ROOM:"";
-  const recent=getRecentRooms().filter(r=>r!==ROOM);   // 今の部屋は重複表示しない
-  if(recent.length){
-    $("gateChips").innerHTML=recent.map(r=>`<button type="button" class="gate-chip" data-room="${esc(r)}">${esc(r)}</button>`).join("");
-    $("gateRecent").style.display="";
-  }else{$("gateRecent").style.display="none";}
-  $("roomGate").style.display="flex";
-  // 入力欄にフォーカスし全選択（すぐ打ち替えられるように）。描画後に実行。
-  setTimeout(()=>{const i=$("gateInput");i.focus();i.select();},0);
-}
-// 合言葉を確定してメイン画面へ入る。検証→ROOM更新→端末に記憶→最近一覧へ→入り口を閉じて一覧表示。
-function enterRoom(name){
-  name=(name||"").trim();
-  // Firestoreのパス名として安全な文字に限定（半角英数・ハイフン・アンダースコア、1〜40文字）。
-  if(!/^[A-Za-z0-9_-]{1,40}$/.test(name)){uiToast("合言葉は半角の英数字・ハイフン・アンダースコア（1〜40文字）で入力してください");return;}
-  const changed=(name!==ROOM);
-  ROOM=name;
-  try{localStorage.setItem(ROOM_KEY,ROOM);}catch(e){}     // この端末に記憶（次回もこの部屋で開く）
-  pushRecentRoom(ROOM);
-  refreshRoomLabel();
-  $("roomGate").style.display="none";                    // 入り口を閉じてメイン画面へ
-  renderLibList();                                       // この部屋の保存一覧を表示
-  if(changed)uiToast(`合言葉「${ROOM}」で入室しました`);
-}
-
-
 // ===== 各ボタンの動作を割り当て =====
 // 生成本体。乱数の種をランダムに作って generate を呼び、成功したら設定欄を畳む。
 function doGen(){if(generate((Math.random()*1e9)>>>0))setCfg(false);}
@@ -1447,49 +1504,383 @@ function doGen(){if(generate((Math.random()*1e9)>>>0))setCfg(false);}
 $("gen").onclick=()=>{if(hasScores())uiConfirm("新しく生成すると、入力した点数は失われます。よろしいですか？",doGen);else doGen();};
 $("regen").onclick=()=>{if(hasScores())uiConfirm("再生成すると、入力した点数は失われます。よろしいですか？",doGen);else doGen();};
 $("clearScores").onclick=()=>{if(!hasScores())return;uiConfirm("入力した点数をすべてクリアします。よろしいですか？",()=>{scores={};saveScores(true);render();uiToast("点数をクリアしました");});};
-$("copyImg").onclick=copyStandingsImage;             // 「順位表を画像でコピー」
+$("copyImg").addEventListener("click", e => { e.stopPropagation(); copyStandingsImage(); });
 // 大会ライブラリ（インライン一覧）の各操作を割り当て
 $("libSaveBtn").onclick=()=>saveCurrentToLibrary($("libName").value);
-// 名前欄でEnterを押しても保存できるように
 $("libName").addEventListener("keydown",e=>{if(e.key==="Enter")saveCurrentToLibrary($("libName").value);});
-// 一覧内の「読み込み」「削除」ボタンを1か所で受ける（イベント委譲）。data-keyで対象を特定。
 $("libList").addEventListener("click",e=>{
   const ld=e.target.closest(".lib-load");if(ld){loadFromLibrary(ld.dataset.key);return;}
   const dl=e.target.closest(".lib-del");if(dl){deleteFromLibrary(dl.dataset.key,dl.dataset.name);return;}
 });
-// ===== 入り口（合言葉）画面の操作を割り当て =====
-$("gateEnter").onclick=()=>enterRoom($("gateInput").value);           // 「入る」で入室
-$("gateInput").addEventListener("keydown",e=>{if(e.key==="Enter")enterRoom($("gateInput").value);});  // Enterでも入室
-// 最近使った合言葉チップをクリックしたら、その合言葉で入室
-$("gateChips").addEventListener("click",e=>{const c=e.target.closest(".gate-chip");if(c)enterRoom(c.dataset.room);});
-// ヘッダーの部屋名ボタンで入り口（合言葉）画面に戻る
-$("roomBtn").onclick=showGate;
-// 印刷の直前は折りたたみ(details)を一時的に全部開き（中身も印刷されるように）、印刷後に元に戻す。
-// d.dataset.w に「元が開いていたか(1/0)」を覚えておく。
+// ===== ログイン・部屋選択画面の操作 =====
+$("loginBtn").onclick = signInGoogle;
+$("createRoomBtn").onclick = createRoom;
+$("joinByCodeBtn").onclick = joinByInviteCode;
+$("newRoomName").addEventListener("keydown", e => { if(e.key==="Enter") createRoom(); });
+$("inviteCodeInput").addEventListener("keydown", e => { if(e.key==="Enter") joinByInviteCode(); });
+$("inviteCodeInput").addEventListener("input", e => {
+  const pos = e.target.selectionStart;
+  e.target.value = e.target.value.toUpperCase();
+  e.target.setSelectionRange(pos, pos);
+});
+$("roomBtn").onclick = () => { if(currentUser) showRoomSelectGate(); };
+$("memberBtn").onclick = showMemberModal;
+$("userBtn").onclick = signOutUser;
+$("memberModalClose").onclick = () => { $("memberModal").style.display="none"; };
+$("copyCodeBtn").onclick = copyInviteCode;
+$("regenCodeBtn").onclick = regenInviteCode;
+$("migrateBtn").onclick = checkMigration;
+$("leaveRoomBtn").onclick = leaveRoom;
+$("deleteRoomBtn").onclick = deleteRoom;
+// 印刷の直前は折りたたみを一時的に全部開く
 window.addEventListener("beforeprint",()=>document.querySelectorAll("details.collapse").forEach(d=>{d.dataset.w=d.open?"1":"0";d.open=true;}));
 window.addEventListener("afterprint",()=>document.querySelectorAll("details.collapse").forEach(d=>{if(d.dataset.w==="0")d.open=false;}));
-// 点数が1つでも入力されているか（Object.keysでキーの数を数える）
 function hasScores(){return Object.keys(scores).length>0;}
 
-// ===== UIヘルパー（自前の確認ダイアログ・通知・補助関数） =====
-// confirm/alert は簡易webview(LINEやアプリ内ブラウザ等)で動かないことがあるため、自前のダイアログを使う。
-// onYes は「はい」を押したときに実行する処理（コールバック関数）。
+// ===== UIヘルパー =====
 function uiConfirm(msg,onYes){const bg=$("modal");$("modalMsg").textContent=msg;bg.style.display="flex";
-  const y=$("modalYes"),n=$("modalNo");const close=()=>{bg.style.display="none";y.onclick=null;n.onclick=null;};  // 閉じる時にハンドラも掃除
+  const y=$("modalYes"),n=$("modalNo");const close=()=>{bg.style.display="none";y.onclick=null;n.onclick=null;};
   y.onclick=()=>{close();onYes();};n.onclick=close;}
-// 画面上部に一瞬出る通知（トースト）。2秒後に自動で消す。連続呼び出しはタイマーを張り直す。
 function uiToast(msg){const t=$("toast");t.textContent=msg;t.classList.add("show");clearTimeout(uiToast._t);uiToast._t=setTimeout(()=>t.classList.remove("show"),2000);}
-function short(s){return s.length>4?s.slice(0,4):s;}  // マトリクス見出し用に名前を4文字へ短縮
-// HTMLエスケープ。文字列中の & < > " を実体参照に変換し、表示崩れやXSS（不正なHTML/スクリプト挿入）を防ぐ。
+function short(s){return s.length>4?s.slice(0,4):s;}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 
-// ===== 起動処理（ページ読み込み時に一度だけ実行される） =====
-applySettingsToInputs();                    // 設定欄に初期値を表示
-if(!restore()) generate(12345);             // 前回データがあれば復元、無ければ固定の種で初期表示を作る
-refreshRoomLabel();                         // ヘッダーの部屋名を表示
-// 入り口（合言葉）画面を最前面に出す。メイン画面は背後で準備済み。
-// 合言葉を入れて「入る」と入り口が閉じ、その部屋の保存一覧が読み込まれる。
-showGate();
+// ===== 認証・部屋管理 =====
+
+function refreshRoomLabel(){
+  $("roomLabel").textContent = currentRoomData ? currentRoomData.name : "—";
+}
+
+function updateUserUI(){
+  if(!currentUser) return;
+  const av = $("userAvatar");
+  if(currentUser.photoURL){ av.src = currentUser.photoURL; av.style.display = "inline"; }
+  else { av.style.display = "none"; }
+  $("userNameLabel").textContent = currentUser.displayName || currentUser.email || "";
+}
+
+function showLoginGate(){
+  $("loginSpinner").style.display = "none";
+  $("loginContent").style.display = "";
+  $("loginGate").style.display = "flex";
+  $("roomSelectGate").style.display = "none";
+}
+
+async function showRoomSelectGate(){
+  $("loginGate").style.display = "none";
+  $("roomSelectGate").style.display = "flex";
+  const u = currentUser;
+  $("gateUserRow").innerHTML =
+    `${u.photoURL ? `<img src="${esc(u.photoURL)}" width="36" height="36" style="border-radius:50%;flex:0 0 auto">` : ""}
+     <div style="flex:1;min-width:0">
+       <div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(u.displayName||u.email||"")}</div>
+       <div style="font-size:12px;color:var(--muted)">${esc(u.email||"")}</div>
+     </div>
+     <button class="btn-sub" id="signOutBtnGate" style="flex:0 0 auto;font-size:12px;padding:6px 12px">ログアウト</button>`;
+  $("signOutBtnGate").onclick = () => signOutUser();
+  $("newRoomName").value = "";
+  $("inviteCodeInput").value = "";
+  await renderMyRooms();
+}
+
+async function renderMyRooms(){
+  const box = $("myRoomsList");
+  box.innerHTML = '<div class="lib-empty">読み込み中…</div>';
+  try{
+    const snap = await db.collection("rooms")
+      .where("memberUids","array-contains", currentUser.uid)
+      .get();
+    if(snap.empty){
+      box.innerHTML = '<div class="lib-empty">まだ部屋がありません。新規作成するか招待コードで参加してください。</div>';
+      return;
+    }
+    const rooms = snap.docs.map(d => ({id:d.id, ...d.data()}));
+    rooms.sort((a,b) => String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
+    box.innerHTML = rooms.map(r => {
+      const myRole = r.members && r.members[currentUser.uid] ? r.members[currentUser.uid].role : "member";
+      const count = r.memberUids ? r.memberUids.length : Object.keys(r.members||{}).length;
+      return `<div class="my-room-item" data-room-id="${esc(r.id)}">
+        <div class="lib-meta">
+          <div class="lib-name">${esc(r.name)}</div>
+          <div class="lib-sub">${count}人　${myRole==="owner"?"オーナー":"メンバー"}</div>
+        </div>
+        <button class="btn-main" style="padding:7px 14px;font-size:13px;flex:0 0 auto">入室</button>
+      </div>`;
+    }).join("");
+    box.querySelectorAll(".my-room-item").forEach(el=>{
+      el.querySelector("button").onclick = () => selectRoomById(el.dataset.roomId);
+    });
+  }catch(e){
+    box.innerHTML = '<div class="lib-empty">読み込みに失敗しました。</div>';
+  }
+}
+
+function generateInviteCode(){
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let c = "";
+  for(let i = 0; i < 8; i++) c += chars[(Math.random() * chars.length) | 0];
+  return c;
+}
+
+async function createRoom(){
+  const name = ($("newRoomName").value || "").trim();
+  if(!name){ uiToast("部屋名を入力してください"); $("newRoomName").focus(); return; }
+  const uid = currentUser.uid;
+  const memberEntry = {
+    displayName: currentUser.displayName || currentUser.email || "",
+    email: currentUser.email || "",
+    photoURL: currentUser.photoURL || "",
+    role: "owner",
+    joinedAt: new Date().toISOString()
+  };
+  try{
+    const ref = await db.collection("rooms").add({
+      name,
+      ownerId: uid,
+      inviteCode: generateInviteCode(),
+      createdAt: new Date().toISOString(),
+      memberUids: [uid],
+      members: { [uid]: memberEntry }
+    });
+    await selectRoomById(ref.id);
+    checkMigration();
+  }catch(e){
+    uiToast("部屋の作成に失敗しました: " + e.message);
+  }
+}
+
+async function joinByInviteCode(){
+  const code = ($("inviteCodeInput").value || "").trim().toUpperCase();
+  if(code.length !== 8){ uiToast("招待コードは8文字です"); return; }
+  try{
+    const snap = await db.collection("rooms").where("inviteCode","==",code).limit(1).get();
+    if(snap.empty){ uiToast("招待コードが見つかりません"); return; }
+    const d = snap.docs[0];
+    const uid = currentUser.uid;
+    if(!d.data().memberUids || !d.data().memberUids.includes(uid)){
+      await db.collection("rooms").doc(d.id).update({
+        memberUids: firebase.firestore.FieldValue.arrayUnion(uid),
+        [`members.${uid}`]: {
+          displayName: currentUser.displayName || currentUser.email || "",
+          email: currentUser.email || "",
+          photoURL: currentUser.photoURL || "",
+          role: "member",
+          joinedAt: new Date().toISOString()
+        }
+      });
+    }
+    await selectRoomById(d.id);
+  }catch(e){
+    uiToast("参加に失敗しました: " + e.message);
+  }
+}
+
+async function selectRoomById(roomId){
+  try{
+    const snap = await db.collection("rooms").doc(roomId).get();
+    if(!snap.exists){ uiToast("部屋が見つかりません"); return; }
+    const data = snap.data();
+    if(!data.memberUids || !data.memberUids.includes(currentUser.uid)){
+      uiToast("この部屋のメンバーではありません"); return;
+    }
+    currentRoomId = roomId;
+    currentRoomData = data;
+    try{ localStorage.setItem(ROOM_ID_KEY, roomId); }catch(e){}
+    refreshRoomLabel();
+    $("loginGate").style.display = "none";
+    $("roomSelectGate").style.display = "none";
+    renderLibList();
+  }catch(e){
+    uiToast("部屋の読み込みに失敗しました: " + e.message);
+  }
+}
+
+function signInGoogle(){
+  const provider = new firebase.auth.GoogleAuthProvider();
+  firebase.auth().signInWithPopup(provider).catch(e => {
+    uiToast("ログインに失敗しました: " + e.message);
+  });
+}
+
+function signOutUser(){
+  uiConfirm("ログアウトしますか？", () => {
+    currentRoomId = null; currentRoomData = null;
+    try{ localStorage.removeItem(ROOM_ID_KEY); }catch(e){}
+    firebase.auth().signOut();
+  });
+}
+
+// ===== メンバー管理モーダル =====
+
+function showMemberModal(){
+  if(!currentRoomData){ uiToast("部屋に入室してください"); return; }
+  $("memberModalRoomName").textContent = currentRoomData.name;
+  $("memberModalCode").textContent = currentRoomData.inviteCode || "—";
+  const isOwner = (currentRoomData.ownerId === currentUser.uid);
+  $("regenCodeBtn").style.display = isOwner ? "" : "none";
+  $("deleteRoomBtn").style.display = isOwner ? "" : "none";
+  $("leaveRoomBtn").style.display = isOwner ? "none" : "";
+  renderMemberList();
+  $("memberModal").style.display = "flex";
+}
+
+function renderMemberList(){
+  const members = currentRoomData.members || {};
+  const isOwner = (currentRoomData.ownerId === currentUser.uid);
+  const html = Object.entries(members).map(([uid, m]) => {
+    const isMe = (uid === currentUser.uid);
+    const isThisOwner = (uid === currentRoomData.ownerId);
+    const removeBtn = isOwner && !isThisOwner
+      ? `<button class="btn-sub member-remove" data-uid="${esc(uid)}"
+           style="font-size:12px;padding:5px 10px;color:var(--bad);border-color:var(--bad);flex:0 0 auto">削除</button>`
+      : "";
+    const avatar = m.photoURL
+      ? `<img src="${esc(m.photoURL)}" width="32" height="32" style="border-radius:50%;flex:0 0 auto">`
+      : `<div style="width:32px;height:32px;border-radius:50%;background:var(--chip);flex:0 0 auto;display:flex;align-items:center;justify-content:center">👤</div>`;
+    return `<div class="member-item">
+      ${avatar}
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          ${esc(m.displayName||m.email||uid)}${isMe ? " <span style='color:var(--muted);font-weight:400'>(あなた)</span>" : ""}
+        </div>
+        <div style="font-size:11px;color:var(--muted)">${isThisOwner ? "オーナー" : "メンバー"}</div>
+      </div>
+      ${removeBtn}
+    </div>`;
+  }).join("");
+  $("memberModalList").innerHTML = html || '<div class="lib-empty">メンバーがいません</div>';
+  $("memberModalList").querySelectorAll(".member-remove").forEach(btn => {
+    btn.onclick = () => removeMember(btn.dataset.uid);
+  });
+}
+
+async function removeMember(uid){
+  const m = currentRoomData.members[uid];
+  const name = m ? (m.displayName || m.email || uid) : uid;
+  uiConfirm(`「${name}」をこの部屋から削除しますか？`, async () => {
+    try{
+      await db.collection("rooms").doc(currentRoomId).update({
+        memberUids: firebase.firestore.FieldValue.arrayRemove(uid),
+        [`members.${uid}`]: firebase.firestore.FieldValue.delete()
+      });
+      currentRoomData.memberUids = (currentRoomData.memberUids||[]).filter(u => u !== uid);
+      delete currentRoomData.members[uid];
+      renderMemberList();
+      uiToast(`${name} を削除しました`);
+    }catch(e){ uiToast("削除に失敗しました"); }
+  });
+}
+
+function copyInviteCode(){
+  const code = $("memberModalCode").textContent;
+  if(!code || code === "—") return;
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(code).then(() => uiToast("招待コードをコピーしました"));
+  } else {
+    const el = document.createElement("textarea");
+    el.value = code; document.body.appendChild(el); el.select();
+    document.execCommand("copy"); document.body.removeChild(el);
+    uiToast("招待コードをコピーしました");
+  }
+}
+
+async function regenInviteCode(){
+  uiConfirm("招待コードを再生成しますか？\n古いコードは無効になります。", async () => {
+    const newCode = generateInviteCode();
+    try{
+      await db.collection("rooms").doc(currentRoomId).update({ inviteCode: newCode });
+      currentRoomData.inviteCode = newCode;
+      $("memberModalCode").textContent = newCode;
+      uiToast("招待コードを再生成しました");
+    }catch(e){ uiToast("再生成に失敗しました"); }
+  });
+}
+
+async function leaveRoom(){
+  uiConfirm("この部屋から退出しますか？", async () => {
+    const uid = currentUser.uid;
+    try{
+      await db.collection("rooms").doc(currentRoomId).update({
+        memberUids: firebase.firestore.FieldValue.arrayRemove(uid),
+        [`members.${uid}`]: firebase.firestore.FieldValue.delete()
+      });
+      currentRoomId = null; currentRoomData = null;
+      try{ localStorage.removeItem(ROOM_ID_KEY); }catch(e){}
+      $("memberModal").style.display = "none";
+      showRoomSelectGate();
+    }catch(e){ uiToast("退出に失敗しました"); }
+  });
+}
+
+async function deleteRoom(){
+  const name = currentRoomData ? currentRoomData.name : "この部屋";
+  uiConfirm(`「${name}」を削除しますか？\n保存された大会データもすべて失われます。`, async () => {
+    try{
+      await db.collection("rooms").doc(currentRoomId).delete();
+      currentRoomId = null; currentRoomData = null;
+      try{ localStorage.removeItem(ROOM_ID_KEY); }catch(e){}
+      $("memberModal").style.display = "none";
+      showRoomSelectGate();
+    }catch(e){ uiToast("削除に失敗しました"); }
+  });
+}
+
+// ===== 旧データ（合言葉方式）からの移行 =====
+async function checkMigration(){
+  try{
+    const snap = await db.collection("rooms").doc("toshigaku-mahjong").collection("tournaments").limit(1).get();
+    if(!snap.empty){
+      uiConfirm("旧形式の大会データが見つかりました。現在の部屋に引き継ぎますか？", migrateOldData);
+    } else {
+      uiToast("引き継ぐ旧データが見つかりませんでした");
+    }
+  }catch(e){ uiToast("旧データの確認に失敗しました: " + e.message); }
+}
+
+async function migrateOldData(){
+  try{
+    const snap = await db.collection("rooms").doc("toshigaku-mahjong").collection("tournaments").get();
+    for(const d of snap.docs) await libCol().doc(d.id).set(d.data());
+    renderLibList();
+    uiToast(`${snap.docs.length}件の大会データを引き継ぎました`);
+  }catch(e){
+    uiToast("引き継ぎに失敗しました: " + e.message);
+  }
+}
+
+// ===== 起動処理 =====
+applySettingsToInputs();
+if(!restore()) generate(12345);
+
+firebase.auth().onAuthStateChanged(async user => {
+  if(!user){
+    currentUser = null; currentRoomId = null; currentRoomData = null;
+    refreshRoomLabel();
+    showLoginGate();
+  } else {
+    currentUser = user;
+    updateUserUI();
+    const savedRoomId = localStorage.getItem(ROOM_ID_KEY);
+    if(savedRoomId){
+      try{
+        const snap = await db.collection("rooms").doc(savedRoomId).get();
+        if(snap.exists){
+          const data = snap.data();
+          if(data.memberUids && data.memberUids.includes(user.uid)){
+            currentRoomId = savedRoomId;
+            currentRoomData = data;
+            refreshRoomLabel();
+            $("loginGate").style.display = "none";
+            $("roomSelectGate").style.display = "none";
+            renderLibList();
+            return;
+          }
+        }
+      }catch(e){}
+    }
+    showRoomSelectGate();
+  }
+});
 </script>
 </body>
 </html>
