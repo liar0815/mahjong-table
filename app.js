@@ -1208,6 +1208,10 @@ function renderMemberList(){
       ? `<button class="btn-sub member-remove" data-uid="${esc(uid)}"
            style="font-size:12px;padding:5px 10px;color:var(--bad);border-color:var(--bad);flex:0 0 auto">削除</button>`
       : "";
+    const transferBtn = isOwner && !isThisOwner
+      ? `<button class="btn-sub member-transfer" data-uid="${esc(uid)}"
+           style="font-size:12px;padding:5px 10px;flex:0 0 auto" title="このメンバーにオーナー権限を譲渡">譲渡</button>`
+      : "";
     const avatar = m.photoURL
       ? `<img src="${esc(m.photoURL)}" width="32" height="32" style="border-radius:50%;flex:0 0 auto">`
       : `<div style="width:32px;height:32px;border-radius:50%;background:var(--chip);flex:0 0 auto;display:flex;align-items:center;justify-content:center">👤</div>`;
@@ -1219,12 +1223,15 @@ function renderMemberList(){
         </div>
         <div style="font-size:11px;color:var(--muted)">${isThisOwner ? "オーナー" : "メンバー"}</div>
       </div>
-      ${removeBtn}
+      ${transferBtn}${removeBtn}
     </div>`;
   }).join("");
   $("memberModalList").innerHTML = html || '<div class="lib-empty">メンバーがいません</div>';
   $("memberModalList").querySelectorAll(".member-remove").forEach(btn => {
     btn.onclick = () => removeMember(btn.dataset.uid);
+  });
+  $("memberModalList").querySelectorAll(".member-transfer").forEach(btn => {
+    btn.onclick = () => transferOwnership(btn.dataset.uid);
   });
 }
 
@@ -1242,6 +1249,29 @@ async function removeMember(uid){
       renderMemberList();
       uiToast(`${name} を削除しました`);
     }catch(e){ uiToast("削除に失敗しました"); }
+  });
+}
+
+async function transferOwnership(newUid){
+  const m = currentRoomData.members[newUid];
+  const name = m ? (m.displayName || m.email || newUid) : newUid;
+  uiConfirm(`「${name}」にオーナー権限を譲渡しますか？\nあなたはメンバーになります。`, async () => {
+    const myUid = currentUser.uid;
+    try{
+      await db.collection("rooms").doc(currentRoomId).update({
+        ownerId: newUid,
+        [`members.${newUid}.role`]: "owner",
+        [`members.${myUid}.role`]: "member"
+      });
+      currentRoomData.ownerId = newUid;
+      if(currentRoomData.members[newUid]) currentRoomData.members[newUid].role = "owner";
+      if(currentRoomData.members[myUid]) currentRoomData.members[myUid].role = "member";
+      $("regenCodeBtn").style.display = "none";
+      $("deleteRoomBtn").style.display = "none";
+      $("leaveRoomBtn").style.display = "";
+      renderMemberList();
+      uiToast(`「${name}」にオーナー権限を譲渡しました`);
+    }catch(e){ uiToast("譲渡に失敗しました"); }
   });
 }
 
