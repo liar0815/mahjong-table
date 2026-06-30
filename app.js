@@ -1282,7 +1282,10 @@ async function leaveRoom(){
       try{ localStorage.removeItem(ROOM_ID_KEY); }catch(e){}
       $("memberModal").style.display = "none";
       showRoomSelectGate();
-    }catch(e){ uiToast("退出に失敗しました"); }
+    }catch(e){
+      console.error("退出エラー:", e.code, e.message);
+      uiToast("退出に失敗しました（" + (e.code || e.message) + "）");
+    }
   });
 }
 
