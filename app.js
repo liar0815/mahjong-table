@@ -364,7 +364,7 @@ function render(){
   if(st.gmin!==st.gmax) notes.push(`参加人数が4の倍数でないため試合数を完全に揃えられません（${st.gmin}〜${st.gmax}試合・差は1まで）。`);
   if(Bpr>0) notes.push(`各ラウンド ${Bpr} 人が抜け番（待機）。抜け番は全員に均等に回しています。`);
   $("note").innerHTML=notes.length?`<div class="note">※ ${notes.join(' ')}</div>`:"";   // 無ければ空
-  $("statsBrief").textContent=`${P}人・${R}戦・抜け番 ${Bpr||'なし'}・対戦差 ${spread}・親番差 ${st.ws}`;  // 折りたたみ見出しの要約
+  $("statsBrief").textContent="";
 
   // --- 対戦表（各戦の卓と席）のHTMLを組み立て ---
   let h="";                                        // hにHTML文字列を継ぎ足していく
@@ -536,7 +536,7 @@ function updateTotals(){
 // ===== 個人成績（各賞＋平均着順・着順分布・スコア推移） =====
 // 順位表と同じ並び（合計スコア降順）で、各人の詳細を表にする。先頭に各賞のカードを出す。
 function renderPlayerStats(rows,anyScore,rankCount,history,bust){
-  $("pstatBrief").textContent=anyScore?`首位 ${rows[0].name} ${fmtSigned(rows[0].total)}`:"点数未入力";
+  $("pstatBrief").textContent="";
   if(!anyScore){$("pstats").innerHTML='<div class="hint" style="padding:4px 0">点数を入力すると、順位・合計スコア・平均着順・トップ/ラス回数・スコア推移を表示します。</div>';return;}
   // --- 各賞の集計（消化のある人だけが対象） ---
   const played=rows.filter(r=>r.completed>0);
