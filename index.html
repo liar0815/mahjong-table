@@ -500,8 +500,7 @@
     <div id="memberModalList" style="max-height:32vh;overflow:auto;display:flex;flex-direction:column;gap:6px"></div>
     <!-- 旧データ引き継ぎ・退出・削除ボタン -->
     <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn-sub" id="migrateBtn" style="color:var(--accent);border-color:var(--accent)" title="旧合言葉方式で保存したデータをこの部屋に引き継ぎます">旧データを引き継ぐ</button>
-      <button class="btn-sub" id="leaveRoomBtn" style="color:var(--warn);border-color:var(--warn)">この部屋から退出する</button>
+<button class="btn-sub" id="leaveRoomBtn" style="color:var(--warn);border-color:var(--warn)">この部屋から退出する</button>
       <button class="btn-sub" id="deleteRoomBtn" style="color:var(--bad);border-color:var(--bad);display:none">部屋を削除する</button>
     </div>
   </div>
@@ -1529,7 +1528,6 @@ $("userBtn").onclick = signOutUser;
 $("memberModalClose").onclick = () => { $("memberModal").style.display="none"; };
 $("copyCodeBtn").onclick = copyInviteCode;
 $("regenCodeBtn").onclick = regenInviteCode;
-$("migrateBtn").onclick = checkMigration;
 $("leaveRoomBtn").onclick = leaveRoom;
 $("deleteRoomBtn").onclick = deleteRoom;
 // 印刷の直前は折りたたみを一時的に全部開く
@@ -1643,7 +1641,6 @@ async function createRoom(){
       members: { [uid]: memberEntry }
     });
     await selectRoomById(ref.id);
-    checkMigration();
   }catch(e){
     uiToast("部屋の作成に失敗しました: " + e.message);
   }
@@ -1826,28 +1823,6 @@ async function deleteRoom(){
   });
 }
 
-// ===== 旧データ（合言葉方式）からの移行 =====
-async function checkMigration(){
-  try{
-    const snap = await db.collection("rooms").doc("toshigaku-mahjong").collection("tournaments").limit(1).get();
-    if(!snap.empty){
-      uiConfirm("旧形式の大会データが見つかりました。現在の部屋に引き継ぎますか？", migrateOldData);
-    } else {
-      uiToast("引き継ぐ旧データが見つかりませんでした");
-    }
-  }catch(e){ uiToast("旧データの確認に失敗しました: " + e.message); }
-}
-
-async function migrateOldData(){
-  try{
-    const snap = await db.collection("rooms").doc("toshigaku-mahjong").collection("tournaments").get();
-    for(const d of snap.docs) await libCol().doc(d.id).set(d.data());
-    renderLibList();
-    uiToast(`${snap.docs.length}件の大会データを引き継ぎました`);
-  }catch(e){
-    uiToast("引き継ぎに失敗しました: " + e.message);
-  }
-}
 
 // ===== 起動処理 =====
 applySettingsToInputs();
