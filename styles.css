@@ -1076,10 +1076,12 @@ details.collapse .lib-inline{ padding:0 16px 16px; }
   .stat  { flex:1 1 calc(50% - 4px); min-width:0; padding:12px 14px; }
   .stat .v { font-size:19px; }
   .tables { grid-template-columns:1fr; gap:12px; }
-  .seat { gap:6px; padding:8px 14px 8px 10px; }
+  .round { padding:12px 10px; }
+  details.collapse #rounds { padding:8px 8px 6px; }
+  .seat { gap:6px; padding:7px 12px 7px 8px; }
   .pname { font-size:13px; }
-  .score-input { width:80px; padding:8px 7px; font-size:15px; }
-  .pt { min-width:72px; width:auto; font-size:12px; }
+  .score-input { width:72px; padding:8px 6px; font-size:14px; }
+  .pt { width:90px; min-width:0; font-size:12px; }
   .standings { padding:14px 14px; }
   table.stb th,
   table.stb td { padding:7px 7px; font-size:13px; }
